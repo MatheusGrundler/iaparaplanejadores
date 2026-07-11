@@ -1,0 +1,356 @@
+:root {
+  --carvao: #14171c;
+  --carvao2: #1b1f26;
+  --grafite: #232831;
+  --grafite2: #2d333d;
+  --lime: #93d547;
+  --lime-claro: #c7f284;
+  --lime-escuro: #5e9a22;
+  --offwhite: #f5f2ea;
+  --texto-sec: #a9b0ab;
+  --terracota: #c2683b;
+  --erro: #e07856;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  background: var(--carvao);
+  color: var(--offwhite);
+  font-family: "Poppins", system-ui, -apple-system, sans-serif;
+  font-size: 16px;
+  line-height: 1.55;
+  min-height: 100%;
+}
+
+a {
+  color: var(--lime);
+  text-decoration: none;
+}
+
+/* ---------- layout ---------- */
+.shell {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 24px 80px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--grafite);
+  margin-bottom: 36px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  color: var(--offwhite);
+  font-size: 0.95rem;
+}
+
+.brand .spark {
+  color: var(--lime);
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.nav {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.nav a {
+  color: var(--texto-sec);
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 0.88rem;
+  transition: color 0.2s, background 0.2s;
+}
+
+.nav a:hover {
+  color: var(--offwhite);
+  background: rgba(245, 242, 234, 0.05);
+}
+
+.nav a.ativo {
+  color: var(--carvao);
+  background: var(--lime);
+  font-weight: 500;
+}
+
+/* ---------- componentes ---------- */
+.card {
+  background: rgba(245, 242, 234, 0.04);
+  border: 1px solid var(--grafite2);
+  border-radius: 18px;
+  padding: 22px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.pill {
+  display: inline-block;
+  padding: 3px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(245, 242, 234, 0.18);
+  color: var(--lime);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.btn {
+  display: inline-block;
+  background: var(--lime);
+  color: var(--carvao);
+  border: none;
+  border-radius: 999px;
+  padding: 10px 22px;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(147, 213, 71, 0.25);
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+  transform: none;
+  box-shadow: none;
+}
+
+.btn-fantasma {
+  background: transparent;
+  color: var(--offwhite);
+  border: 1px solid rgba(245, 242, 234, 0.3);
+}
+
+.btn-fantasma:hover {
+  border-color: var(--lime);
+  color: var(--lime);
+  box-shadow: none;
+}
+
+.btn-mini {
+  padding: 6px 14px;
+  font-size: 0.8rem;
+}
+
+.btn-perigo {
+  background: transparent;
+  color: var(--erro);
+  border: 1px solid rgba(224, 120, 86, 0.4);
+}
+
+.btn-perigo:hover {
+  box-shadow: none;
+  border-color: var(--erro);
+}
+
+h1 {
+  font-size: 1.6rem;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+h2 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin: 0 0 14px;
+}
+
+.sub {
+  color: var(--texto-sec);
+  font-size: 0.92rem;
+  margin-bottom: 32px;
+}
+
+.muted {
+  color: var(--texto-sec);
+  font-size: 0.85rem;
+}
+
+/* ---------- formulários ---------- */
+input,
+select,
+textarea {
+  width: 100%;
+  background: var(--carvao2);
+  border: 1px solid var(--grafite2);
+  border-radius: 12px;
+  color: var(--offwhite);
+  font-family: inherit;
+  font-size: 0.92rem;
+  padding: 11px 14px;
+  transition: border-color 0.2s;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--lime);
+}
+
+label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--texto-sec);
+  margin: 0 0 6px;
+}
+
+.campo {
+  margin-bottom: 16px;
+}
+
+/* ---------- tabelas (admin) ---------- */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+th {
+  text-align: left;
+  color: var(--texto-sec);
+  font-weight: 500;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--grafite2);
+}
+
+td {
+  padding: 12px;
+  border-bottom: 1px solid var(--grafite);
+  vertical-align: middle;
+}
+
+tr:last-child td {
+  border-bottom: none;
+}
+
+/* ---------- feed ---------- */
+.post {
+  padding: 18px 0;
+  border-bottom: 1px solid var(--grafite);
+}
+
+.post:last-child {
+  border-bottom: none;
+}
+
+.post .autor {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.post .quando {
+  color: var(--texto-sec);
+  font-size: 0.75rem;
+  margin-left: 8px;
+}
+
+.post p {
+  margin-top: 6px;
+  font-size: 0.92rem;
+  white-space: pre-wrap;
+}
+
+.post.fixado {
+  background: rgba(147, 213, 71, 0.06);
+  border: 1px solid rgba(147, 213, 71, 0.25);
+  border-radius: 14px;
+  padding: 18px;
+  margin-bottom: 10px;
+}
+
+/* ---------- estados ---------- */
+.vazio {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--texto-sec);
+}
+
+.vazio .spark {
+  color: var(--lime);
+  font-size: 1.6rem;
+  display: block;
+  margin-bottom: 12px;
+}
+
+.aviso {
+  background: rgba(147, 213, 71, 0.08);
+  border: 1px solid rgba(147, 213, 71, 0.3);
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-size: 0.88rem;
+  margin-bottom: 20px;
+}
+
+.aviso.erro {
+  background: rgba(224, 120, 86, 0.08);
+  border-color: rgba(224, 120, 86, 0.35);
+  color: var(--erro);
+}
+
+/* ---------- login ---------- */
+.login-wrap {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 400px;
+  background: var(--carvao2);
+  border: 1px solid var(--grafite2);
+  border-radius: 24px;
+  padding: 36px;
+}
+
+.stat {
+  font-size: 1.9rem;
+  font-weight: 600;
+  color: var(--lime);
+  line-height: 1.1;
+}
+
+.linha-acoes {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
+}
