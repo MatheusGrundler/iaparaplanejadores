@@ -1,0 +1,4 @@
+-- Marcador da remoção do CMS transitório no projeto remoto.
+-- O histórico local já não cria as três tabelas descartadas, portanto não há
+-- contrato destrutivo a repetir em bancos novos. A estrutura final de
+-- formulários é definida na migration imediatamente anterior.

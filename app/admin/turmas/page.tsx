@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { adminClient } from "@/lib/supabase/admin";
 import { canAccessAdminArea } from "@/lib/auth";
 import { criarTurma, editarTurma } from "../actions";
@@ -6,8 +7,7 @@ export const dynamic = "force-dynamic";
 
 function paraInputDate(iso: string | null) {
   if (!iso) return "";
-  return new Date(iso)
-    .toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
+  return new Date(iso).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
 }
 
 export default async function TurmasPage() {
@@ -21,16 +21,14 @@ export default async function TurmasPage() {
 
   const porTurma = new Map<number, number>();
   for (const a of alunos ?? []) {
-    if (a.turma_id)
-      porTurma.set(a.turma_id, (porTurma.get(a.turma_id) ?? 0) + 1);
+    if (a.turma_id) porTurma.set(a.turma_id, (porTurma.get(a.turma_id) ?? 0) + 1);
   }
 
   return (
     <main>
       <h1>Turmas</h1>
       <p className="sub">
-        Cada turma tem um prazo padrão de acesso (Acesso até). Aluno sem prazo
-        individual herda o da turma. Sugestão: fim da turma + 6 meses.
+        Defina o período de acesso da turma. A liberação das etapas é controlada separadamente.
       </p>
 
       <div className="card" style={{ marginBottom: 24 }}>
@@ -66,6 +64,25 @@ export default async function TurmasPage() {
 
       {(turmas ?? []).map((t) => (
         <div className="card" key={t.id} style={{ marginBottom: 14 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+              marginBottom: 16,
+            }}
+          >
+            <div>
+              <strong>{t.nome}</strong>
+              <p className="muted" style={{ margin: "4px 0 0" }}>
+                {porTurma.get(t.id) ?? 0} aluno(s) · prazo compartilhado
+              </p>
+            </div>
+            <Link className="btn btn-mini" href={`/admin/semanas#turma-${t.id}`}>
+              Liberar etapas
+            </Link>
+          </div>
           <form
             action={editarTurma}
             style={{
@@ -77,9 +94,7 @@ export default async function TurmasPage() {
           >
             <input type="hidden" name="id" value={t.id} />
             <div>
-              <label>
-                Nome · {porTurma.get(t.id) ?? 0} aluno(s)
-              </label>
+              <label>Nome</label>
               <input name="nome" defaultValue={t.nome} required />
             </div>
             <div>
@@ -92,11 +107,7 @@ export default async function TurmasPage() {
             </div>
             <div>
               <label>Acesso até</label>
-              <input
-                name="acesso_ate"
-                type="date"
-                defaultValue={paraInputDate(t.acesso_ate)}
-              />
+              <input name="acesso_ate" type="date" defaultValue={paraInputDate(t.acesso_ate)} />
             </div>
             <button className="btn btn-fantasma btn-mini">Salvar</button>
           </form>

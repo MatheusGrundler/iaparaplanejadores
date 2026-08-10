@@ -1,0 +1,3 @@
+-- Marcador da versão de baseline registrada no projeto remoto.
+-- Em uma instalação nova, a baseline reproduzível é aplicada pela migration
+-- 20260711195822_baseline_expected_schema.sql logo em seguida.

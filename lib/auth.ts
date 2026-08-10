@@ -6,11 +6,31 @@ export { expiracaoEfetiva } from "@/lib/access";
 
 export type MemberStatus = "ok" | "expirado" | "sem-acesso";
 
+export type MemberIdentity = {
+  userId: string;
+  email: string;
+  admin: boolean;
+};
+
 export async function getUserEmail(): Promise<string | null> {
   const supabase = await createClient();
   const { data } = await supabase.auth.getClaims();
   const email = data?.claims.email;
   return typeof email === "string" ? normalizeEmail(email) : null;
+}
+
+/** Identidade autenticada para dados que pertencem ao aluno. */
+export async function getMemberIdentity(): Promise<MemberIdentity | null> {
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getClaims();
+  const sub = data?.claims.sub;
+  const emailClaim = data?.claims.email;
+  if (typeof sub !== "string" || typeof emailClaim !== "string") return null;
+
+  const email = normalizeEmail(emailClaim);
+  const [status, admin] = await Promise.all([memberStatus(email), isAdmin(email)]);
+  if (status !== "ok" && !admin) return null;
+  return { userId: sub, email, admin };
 }
 
 export async function memberStatus(email: string): Promise<MemberStatus> {
@@ -49,10 +69,7 @@ export async function isAdmin(email: string): Promise<boolean> {
 export async function canAccessMemberArea(): Promise<boolean> {
   const email = await getUserEmail();
   if (!email) return false;
-  const [status, admin] = await Promise.all([
-    memberStatus(email),
-    isAdmin(email),
-  ]);
+  const [status, admin] = await Promise.all([memberStatus(email), isAdmin(email)]);
   return status === "ok" || admin;
 }
 

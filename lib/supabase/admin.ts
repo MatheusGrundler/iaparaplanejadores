@@ -7,9 +7,17 @@ import { supabaseSecretKey, supabaseUrl } from "./env";
  * e sempre depois de conferir quem está chamando (aluno logado ou admin).
  */
 export function adminClient() {
-  return createClient(
-    supabaseUrl(),
-    supabaseSecretKey(),
-    { auth: { persistSession: false, autoRefreshToken: false } }
-  );
+  return createClient(supabaseUrl(), supabaseSecretKey(), {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
 }
+
+/**
+ * Ponto único para novos fluxos server-side que precisam do cliente elevado.
+ * Mantém a criação da infraestrutura confinada a este adapter.
+ */
+export function privilegedDatabase() {
+  return adminClient();
+}
+
+export type PrivilegedDatabase = ReturnType<typeof adminClient>;

@@ -16,44 +16,47 @@ export async function middleware(request: NextRequest) {
 
   const applyAuthState = (target: NextResponse) => {
     response.cookies.getAll().forEach((cookie) => target.cookies.set(cookie));
-    Object.entries(authHeaders).forEach(([name, value]) =>
-      target.headers.set(name, value)
-    );
+    Object.entries(authHeaders).forEach(([name, value]) => target.headers.set(name, value));
     return target;
   };
 
-  const supabase = createServerClient(
-    supabaseUrl(),
-    supabasePublicKey(),
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet: CookieToSet[], headers: Record<string, string>) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
-          );
-          response = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          );
-          authHeaders = { ...authHeaders, ...headers };
-          Object.entries(authHeaders).forEach(([name, value]) =>
-            response.headers.set(name, value)
-          );
-        },
+  const supabase = createServerClient(supabaseUrl(), supabasePublicKey(), {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
       },
-    }
-  );
+      setAll(cookiesToSet: CookieToSet[], headers: Record<string, string>) {
+        cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+        response = NextResponse.next({ request });
+        cookiesToSet.forEach(({ name, value, options }) =>
+          response.cookies.set(name, value, options),
+        );
+        authHeaders = { ...authHeaders, ...headers };
+        Object.entries(authHeaders).forEach(([name, value]) => response.headers.set(name, value));
+      },
+    },
+  });
 
   // Verifica a assinatura do token e renova a sessão quando necessário.
   const { data } = await supabase.auth.getClaims();
   const isAuthenticated = Boolean(data?.claims.sub);
 
   const { pathname } = request.nextUrl;
+
+  // Landing pública: anônimo na raiz vê a página de vendas (um projeto só);
+  // logado segue para a área de conteúdos, na mesma raiz.
+  if (pathname === "/" && !isAuthenticated) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/landing.html";
+    return applyAuthState(NextResponse.rewrite(url));
+  }
+
   const isPublic =
-    pathname.startsWith("/login") || pathname.startsWith("/auth");
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/auth") ||
+    pathname === "/landing.html" ||
+    pathname === "/api/inscricao" ||
+    pathname.startsWith("/videos-institucional");
 
   if (!isAuthenticated && !isPublic) {
     const url = request.nextUrl.clone();

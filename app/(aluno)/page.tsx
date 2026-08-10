@@ -1,78 +1,184 @@
-import { createClient } from "@/lib/supabase/server";
-import { adminClient } from "@/lib/supabase/admin";
-import { canAccessMemberArea } from "@/lib/auth";
+import Link from "next/link";
+import { CONTEUDOS_NATIVOS } from "@/app/componentes/curso/conteudos";
+import { getMemberIdentity } from "@/lib/auth";
+import { SEMANA_KEYS, type SemanaKey } from "@/lib/curso-atividades";
+import { carregarStatusCurso } from "@/lib/curso-estado";
+import { carregarLiberacoesSemanas } from "@/lib/curso-liberacao";
+import { chaveEtapaDoSlug, slugPublicoEtapa } from "@/lib/curso-nomenclatura";
+import { FORMULARIOS_INICIAIS } from "@/lib/formularios";
 
 export const dynamic = "force-dynamic";
 
-type Card = {
-  id: number;
-  tag: string | null;
-  titulo: string;
-  desc: string | null;
-  ordem: number;
+type Props = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
-export default async function ConteudosPage() {
-  // O layout melhora a UX; este gate protege o acesso à secret key.
-  if (!(await canAccessMemberArea())) return null;
+function statusDaSemana(
+  atividades: ReadonlyArray<{ key: string }>,
+  progresso: Awaited<ReturnType<typeof carregarStatusCurso>>,
+) {
+  const concluidas = atividades.filter((atividade) => {
+    const status = progresso.get(atividade.key)?.status;
+    return status === "enviada" || status === "revisada";
+  }).length;
+  return {
+    concluidas,
+    total: atividades.length,
+    pronto: atividades.length > 0 && concluidas === atividades.length,
+    iniciado: atividades.some((atividade) => progresso.has(atividade.key)),
+  };
+}
 
-  const supabase = await createClient();
+function formulariosQuestDaEtapa(semanaKey: SemanaKey) {
+  return FORMULARIOS_INICIAIS.filter(
+    (formulario) =>
+      formulario.workflow.tipo === "quest" && formulario.metadados?.semanaKey === semanaKey,
+  ).map((formulario) => ({ key: formulario.codigo }));
+}
 
-  // leitura como aluno (RLS); admin fora da whitelist lê via service_role
-  let { data: cards } = await supabase
-    .from("downloads")
-    .select("id, tag, titulo, desc, ordem")
-    .order("ordem", { ascending: true });
+export default async function ImersaoPage({ searchParams }: Props) {
+  const identity = await getMemberIdentity();
+  if (!identity) return null;
 
-  if (!cards || cards.length === 0) {
-    const { data: viaAdmin } = await adminClient()
-      .from("downloads")
-      .select("id, tag, titulo, desc, ordem")
-      .order("ordem", { ascending: true });
-    cards = viaAdmin ?? [];
-  }
-
-  // quais cards têm arquivo ativo pra baixar
-  const { data: ativos } = await adminClient()
-    .from("arquivos")
-    .select("download_id")
-    .eq("ativo", true);
-  const comArquivo = new Set((ativos ?? []).map((a) => a.download_id));
+  const liberacoes = await carregarLiberacoesSemanas(identity);
+  const itens = SEMANA_KEYS.map((semanaKey, ordem) => {
+    const conteudo = CONTEUDOS_NATIVOS[semanaKey];
+    return {
+      id: semanaKey,
+      ordem,
+      liberada: liberacoes.get(semanaKey) === true,
+      documento: {
+        chave: semanaKey,
+        rotulo: conteudo.metadata.rotulo,
+        conteudo: {
+          slug: semanaKey,
+          number: conteudo.metadata.numero,
+          title: conteudo.metadata.titulo,
+          promise: conteudo.metadata.promessa,
+        },
+        atividades: formulariosQuestDaEtapa(semanaKey),
+      },
+    };
+  });
+  const progresso = await carregarStatusCurso(identity.userId);
+  const parametros = searchParams ? await searchParams : {};
+  const semanaBloqueada = parametros["etapa-bloqueada"] ?? parametros["semana-bloqueada"];
+  const chaveBloqueada =
+    typeof semanaBloqueada === "string" ? chaveEtapaDoSlug(semanaBloqueada) : null;
+  const exibirAvisoBloqueio =
+    chaveBloqueada !== null && itens.some((item) => item.documento.chave === chaveBloqueada);
+  const atividadesDaTrilha = itens.flatMap((item) => item.documento.atividades);
+  const totalAtividades = atividadesDaTrilha.length;
+  const totalConcluidas = atividadesDaTrilha.filter((atividade) => {
+    const status = progresso.get(atividade.key)?.status;
+    return status === "enviada" || status === "revisada";
+  }).length;
+  const percentual = totalAtividades
+    ? Math.round((Math.min(totalConcluidas, totalAtividades) / totalAtividades) * 100)
+    : 0;
 
   return (
-    <main>
-      <h1>Conteúdos</h1>
-      <p className="sub">
-        Os materiais da imersão, sempre na versão mais recente.
-      </p>
+    <main className="curso-home">
+      <section className="curso-progresso-hero" aria-labelledby="progresso-titulo">
+        <div className="curso-progresso-cabecalho">
+          <div>
+            <h1 id="progresso-titulo">Seu progresso</h1>
+            <p>
+              {totalConcluidas} de {totalAtividades} entregas concluídas
+            </p>
+          </div>
+          <strong className="curso-progresso-percentual" aria-hidden="true">
+            {percentual}%
+          </strong>
+        </div>
+        <div
+          className="progresso-trilha"
+          role="progressbar"
+          aria-label="Progresso da imersão"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={percentual}
+          aria-valuetext={`${totalConcluidas} de ${totalAtividades} entregas concluídas`}
+        >
+          <span style={{ width: `${percentual}%` }} />
+        </div>
+      </section>
 
-      {cards.length === 0 ? (
-        <div className="vazio card">
-          <span className="spark">✦</span>
-          Os materiais aparecem aqui assim que forem liberados.
-        </div>
-      ) : (
-        <div className="grid">
-          {(cards as Card[]).map((c) => (
-            <div className="card" key={c.id}>
-              {c.tag && <span className="pill">{c.tag}</span>}
-              <h2 style={{ margin: "12px 0 6px" }}>{c.titulo}</h2>
-              {c.desc && (
-                <p className="muted" style={{ marginBottom: 16 }}>
-                  {c.desc}
-                </p>
-              )}
-              {comArquivo.has(c.id) ? (
-                <a className="btn btn-mini" href={`/api/download/${c.id}`}>
-                  Baixar
-                </a>
-              ) : (
-                <span className="muted">Em breve</span>
-              )}
-            </div>
-          ))}
-        </div>
+      {exibirAvisoBloqueio && (
+        <p className="curso-aviso-bloqueio" role="status">
+          Esta etapa ainda não foi liberada. Quando ela estiver disponível, o acesso aparecerá aqui.
+        </p>
       )}
+
+      <section className="mapa-curso" aria-labelledby="mapa-titulo">
+        <div className="secao-cabecalho">
+          <div>
+            <span className="pill">Imersão</span>
+            <h2 id="mapa-titulo">Minha trilha</h2>
+          </div>
+        </div>
+
+        <div className="semanas-grid">
+          {itens.map((item) => {
+            const semana = item.documento.conteudo;
+            const estado = statusDaSemana(item.documento.atividades, progresso);
+            const liberada = identity.admin || item.liberada;
+            const rotulo = identity.admin
+              ? "Prévia admin"
+              : !liberada
+                ? "Bloqueada"
+                : estado.pronto
+                  ? "Concluída"
+                  : estado.iniciado
+                    ? "Em andamento"
+                    : "Liberada";
+            const classes = [
+              "semana-card",
+              !liberada ? "semana-bloqueada" : "semana-liberada",
+              estado.pronto ? "semana-concluida" : "",
+            ]
+              .filter(Boolean)
+              .join(" ");
+            return (
+              <article
+                className={classes}
+                key={item.id ?? `${semana.slug}-${item.ordem}`}
+                aria-labelledby={`${semana.slug}-titulo`}
+              >
+                <div className="semana-card-topo">
+                  <span className="semana-numero" aria-hidden="true">
+                    {semana.number === 0 ? "P" : String(semana.number).padStart(2, "0")}
+                  </span>
+                  <span className="semana-status">{rotulo}</span>
+                </div>
+                <div>
+                  <p className="semana-eyebrow">{item.documento.rotulo}</p>
+                  <h3 id={`${semana.slug}-titulo`}>{semana.title}</h3>
+                  <p>{semana.promise}</p>
+                </div>
+                <div className="semana-card-rodape">
+                  <span>
+                    {estado.concluidas}/{estado.total} entregas
+                  </span>
+                  {liberada ? (
+                    <Link className="btn btn-mini" href={`/etapa/${slugPublicoEtapa(semana.slug)}`}>
+                      {identity.admin
+                        ? "Pré-visualizar"
+                        : estado.pronto
+                          ? "Revisar etapa"
+                          : estado.iniciado
+                            ? "Continuar"
+                            : "Começar"}
+                    </Link>
+                  ) : (
+                    <span className="semana-bloqueio">Aguardando liberação</span>
+                  )}
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </section>
     </main>
   );
 }

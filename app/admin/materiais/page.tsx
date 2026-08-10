@@ -1,11 +1,6 @@
 import { adminClient } from "@/lib/supabase/admin";
 import { canAccessAdminArea } from "@/lib/auth";
-import {
-  criarCard,
-  removerCard,
-  subirArquivo,
-  ativarVersao,
-} from "../actions";
+import { criarCard, removerCard, subirArquivo, ativarVersao, alternarModo } from "../actions";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +15,7 @@ export default async function MateriaisPage() {
 
   const db = adminClient();
   const [{ data: cards }, { data: arquivos }] = await Promise.all([
-    db.from("downloads").select("id, tag, titulo, desc, ordem").order("ordem"),
+    db.from("downloads").select("id, tag, titulo, desc, ordem, modo").order("ordem"),
     db
       .from("arquivos")
       .select("id, download_id, file, versao, nota, ativo, criado_em")
@@ -38,8 +33,9 @@ export default async function MateriaisPage() {
     <main>
       <h1>Materiais</h1>
       <p className="sub">
-        Cada card aponta pra versão ativa do arquivo. Subiu uma versão nova, o
-        aluno já baixa a nova — e dá pra reverter com um clique.
+        Cada card aponta pra versão ativa do arquivo. Material no modo &quot;Leitura no app&quot;
+        abre dentro da área (HTML ou PDF) e registra quem leu; &quot;Download&quot; é pra kits e
+        pacotes. Acompanhe em <a href="/admin/leituras">Leituras</a>.
       </p>
 
       <div className="card" style={{ marginBottom: 24 }}>
@@ -48,26 +44,33 @@ export default async function MateriaisPage() {
           action={criarCard}
           style={{
             display: "grid",
-            gridTemplateColumns: "1fr 2fr 2fr 80px auto",
+            gridTemplateColumns: "1fr 2fr 2fr 80px auto auto",
             gap: 10,
             alignItems: "end",
           }}
         >
           <div>
             <label>Tag</label>
-            <input name="tag" placeholder="Kit" />
+            <input name="tag" placeholder="Preparação" />
           </div>
           <div>
             <label>Título</label>
-            <input name="titulo" required placeholder="Starter Kit do planejador" />
+            <input name="titulo" required placeholder="Guia O mapa da IA" />
           </div>
           <div>
             <label>Descrição</label>
-            <input name="desc" placeholder="O pacote pra montar seu agente" />
+            <input name="desc" placeholder="Leitura de preparação" />
           </div>
           <div>
             <label>Ordem</label>
             <input name="ordem" type="number" defaultValue={0} />
+          </div>
+          <div>
+            <label>Modo</label>
+            <select name="modo" defaultValue="leitura">
+              <option value="leitura">Leitura no app</option>
+              <option value="download">Download</option>
+            </select>
           </div>
           <button className="btn btn-mini">Criar</button>
         </form>
@@ -87,16 +90,22 @@ export default async function MateriaisPage() {
               }}
             >
               <div>
-                {c.tag && <span className="pill">{c.tag}</span>}{" "}
-                <strong>{c.titulo}</strong>{" "}
+                {c.tag && <span className="pill">{c.tag}</span>} <strong>{c.titulo}</strong>{" "}
+                <span className="pill">{c.modo === "leitura" ? "Leitura no app" : "Download"}</span>{" "}
                 <span className="muted">{c.desc}</span>
               </div>
-              <form action={removerCard}>
-                <input type="hidden" name="id" value={c.id} />
-                <button className="btn btn-perigo btn-mini">
-                  Apagar card
-                </button>
-              </form>
+              <div style={{ display: "flex", gap: 8 }}>
+                <form action={alternarModo}>
+                  <input type="hidden" name="id" value={c.id} />
+                  <button className="btn btn-fantasma btn-mini">
+                    {c.modo === "leitura" ? "Virar download" : "Virar leitura"}
+                  </button>
+                </form>
+                <form action={removerCard}>
+                  <input type="hidden" name="id" value={c.id} />
+                  <button className="btn btn-perigo btn-mini">Apagar card</button>
+                </form>
+              </div>
             </div>
 
             <form
@@ -149,14 +158,8 @@ export default async function MateriaisPage() {
                       <td>
                         {!v.ativo && (
                           <form action={ativarVersao}>
-                            <input
-                              type="hidden"
-                              name="arquivo_id"
-                              value={v.id}
-                            />
-                            <button className="btn btn-fantasma btn-mini">
-                              Reativar
-                            </button>
+                            <input type="hidden" name="arquivo_id" value={v.id} />
+                            <button className="btn btn-fantasma btn-mini">Reativar</button>
                           </form>
                         )}
                       </td>

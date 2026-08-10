@@ -1,9 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getUserEmail, isAdmin } from "@/lib/auth";
+import { getUserEmail, isAdmin, logEvento } from "@/lib/auth";
 import { normalizeEmail } from "@/lib/access";
-import { adminClient } from "@/lib/supabase/admin";
+import { SEMANA_KEYS } from "@/lib/curso-atividades";
+import { privilegedDatabase } from "@/lib/supabase/admin";
 
 const MATERIAL_MAX_BYTES = 50 * 1024 * 1024;
 const MATERIAL_EXTENSIONS = new Set([
@@ -38,15 +39,10 @@ function positiveInteger(value: FormDataEntryValue | null): number | null {
 
 function validEmail(value: FormDataEntryValue | null): string | null {
   const email = normalizeEmail(String(value ?? ""));
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && email.length <= 254
-    ? email
-    : null;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && email.length <= 254 ? email : null;
 }
 
-function textField(
-  value: FormDataEntryValue | null,
-  maxLength: number
-): string | null {
+function textField(value: FormDataEntryValue | null, maxLength: number): string | null {
   const text = String(value ?? "").trim();
   if (!text) return null;
   if (text.length > maxLength) throw new Error("Texto maior que o permitido.");
@@ -80,12 +76,14 @@ export async function liberarAluno(formData: FormData) {
   const turmaValue = String(formData.get("turma_id") ?? "").trim();
   const turmaId = turmaValue ? positiveInteger(formData.get("turma_id")) : null;
   if (turmaValue && !turmaId) throw new Error("Turma inválida.");
-  const { error } = await adminClient().from("whitelist").upsert({
-    email,
-    nome: textField(formData.get("nome"), 160),
-    turma_id: turmaId,
-    expira_em: aoFimDoDia(formData.get("expira_em")),
-  });
+  const { error } = await privilegedDatabase()
+    .from("whitelist")
+    .upsert({
+      email,
+      nome: textField(formData.get("nome"), 160),
+      turma_id: turmaId,
+      expira_em: aoFimDoDia(formData.get("expira_em")),
+    });
   assertOk(error, "Liberação do aluno");
   revalidatePath("/admin/alunos");
 }
@@ -94,10 +92,7 @@ export async function removerAluno(formData: FormData) {
   await requireAdmin();
   const email = validEmail(formData.get("email"));
   if (!email) throw new Error("E-mail inválido.");
-  const { error } = await adminClient()
-    .from("whitelist")
-    .delete()
-    .eq("email", email);
+  const { error } = await privilegedDatabase().from("whitelist").delete().eq("email", email);
   assertOk(error, "Remoção do aluno");
   revalidatePath("/admin/alunos");
 }
@@ -107,7 +102,7 @@ export async function renovarAluno(formData: FormData) {
   await requireAdmin();
   const email = validEmail(formData.get("email"));
   if (!email) throw new Error("E-mail inválido.");
-  const { error } = await adminClient()
+  const { error } = await privilegedDatabase()
     .from("whitelist")
     .update({ expira_em: aoFimDoDia(formData.get("expira_em")) })
     .eq("email", email);
@@ -122,7 +117,7 @@ export async function trocarTurma(formData: FormData) {
   const turmaValue = String(formData.get("turma_id") ?? "").trim();
   const turmaId = turmaValue ? positiveInteger(formData.get("turma_id")) : null;
   if (turmaValue && !turmaId) throw new Error("Turma inválida.");
-  const { error } = await adminClient()
+  const { error } = await privilegedDatabase()
     .from("whitelist")
     .update({ turma_id: turmaId })
     .eq("email", email);
@@ -136,12 +131,14 @@ export async function criarTurma(formData: FormData) {
   await requireAdmin();
   const nome = textField(formData.get("nome"), 160);
   if (!nome) throw new Error("Nome da turma é obrigatório.");
-  const { error } = await adminClient().from("turmas").insert({
-    nome,
-    inicio: String(formData.get("inicio") ?? "") || null,
-    fim: String(formData.get("fim") ?? "") || null,
-    acesso_ate: aoFimDoDia(formData.get("acesso_ate")),
-  });
+  const { error } = await privilegedDatabase()
+    .from("turmas")
+    .insert({
+      nome,
+      inicio: String(formData.get("inicio") ?? "") || null,
+      fim: String(formData.get("fim") ?? "") || null,
+      acesso_ate: aoFimDoDia(formData.get("acesso_ate")),
+    });
   assertOk(error, "Criação da turma");
   revalidatePath("/admin/turmas");
 }
@@ -151,7 +148,7 @@ export async function editarTurma(formData: FormData) {
   const id = positiveInteger(formData.get("id"));
   const nome = textField(formData.get("nome"), 160);
   if (!id || !nome) throw new Error("Dados da turma inválidos.");
-  const { error } = await adminClient()
+  const { error } = await privilegedDatabase()
     .from("turmas")
     .update({
       nome,
@@ -165,19 +162,88 @@ export async function editarTurma(formData: FormData) {
   revalidatePath("/admin/alunos");
 }
 
+/* ---------- liberação das etapas ---------- */
+
+export async function definirLiberacaoSemana(formData: FormData) {
+  const adminEmail = await requireAdmin();
+  const turmaId = positiveInteger(formData.get("turma_id"));
+  const semanaKey = String(formData.get("semana_key") ?? "");
+  const novoEstado = String(formData.get("liberada") ?? "");
+
+  if (!turmaId) throw new Error("Turma inválida.");
+  if (!(SEMANA_KEYS as readonly string[]).includes(semanaKey)) {
+    throw new Error("Etapa inválida.");
+  }
+  if (novoEstado !== "true" && novoEstado !== "false") {
+    throw new Error("Estado de liberação inválido.");
+  }
+
+  const liberada = novoEstado === "true";
+  const agora = new Date().toISOString();
+  const { error } = await privilegedDatabase()
+    .from("turma_semanas")
+    .upsert(
+      {
+        turma_id: turmaId,
+        semana_key: semanaKey,
+        liberada,
+        liberada_em: liberada ? agora : null,
+        atualizada_em: agora,
+      },
+      { onConflict: "turma_id,semana_key" },
+    );
+  assertOk(error, "Atualização da liberação da etapa");
+
+  await logEvento(
+    adminEmail,
+    `${liberada ? "semana_liberada" : "semana_bloqueada"}:${semanaKey}`,
+    turmaId,
+  );
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/semanas");
+  revalidatePath("/");
+  revalidatePath(`/semana/${semanaKey}`);
+  revalidatePath("/etapa/[slug]", "page");
+}
+
 /* ---------- materiais ---------- */
 
 export async function criarCard(formData: FormData) {
   await requireAdmin();
   const titulo = textField(formData.get("titulo"), 200);
   if (!titulo) throw new Error("Título é obrigatório.");
-  const { error } = await adminClient().from("downloads").insert({
-    titulo,
-    tag: textField(formData.get("tag"), 80),
-    desc: textField(formData.get("desc"), 1200),
-    ordem: Math.trunc(Number(formData.get("ordem") ?? 0)) || 0,
-  });
+  const modo = String(formData.get("modo") ?? "leitura");
+  if (modo !== "leitura" && modo !== "download") {
+    throw new Error("Modo inválido.");
+  }
+  const { error } = await privilegedDatabase()
+    .from("downloads")
+    .insert({
+      titulo,
+      tag: textField(formData.get("tag"), 80),
+      desc: textField(formData.get("desc"), 1200),
+      ordem: Math.trunc(Number(formData.get("ordem") ?? 0)) || 0,
+      modo,
+    });
   assertOk(error, "Criação do material");
+  revalidatePath("/admin/materiais");
+  revalidatePath("/");
+}
+
+/** leitura <-> download (leitura abre no app e registra; download baixa arquivo) */
+export async function alternarModo(formData: FormData) {
+  await requireAdmin();
+  const id = positiveInteger(formData.get("id"));
+  if (!id) throw new Error("Material inválido.");
+  const db = privilegedDatabase();
+  const { data: card } = await db.from("downloads").select("modo").eq("id", id).maybeSingle();
+  if (!card) return;
+  const { error } = await db
+    .from("downloads")
+    .update({ modo: card.modo === "leitura" ? "download" : "leitura" })
+    .eq("id", id);
+  assertOk(error, "Troca do modo do material");
   revalidatePath("/admin/materiais");
   revalidatePath("/");
 }
@@ -186,12 +252,9 @@ export async function removerCard(formData: FormData) {
   await requireAdmin();
   const id = positiveInteger(formData.get("id"));
   if (!id) throw new Error("Material inválido.");
-  const db = adminClient();
+  const db = privilegedDatabase();
   // apaga os arquivos do storage antes do card
-  const { data: arquivos } = await db
-    .from("arquivos")
-    .select("file")
-    .eq("download_id", id);
+  const { data: arquivos } = await db.from("arquivos").select("file").eq("download_id", id);
   const paths = (arquivos ?? []).map((a) => a.file);
   if (paths.length) {
     const { error } = await db.storage.from("materiais").remove(paths);
@@ -214,7 +277,7 @@ export async function subirArquivo(formData: FormData) {
     throw new Error("Tipo de arquivo não permitido.");
   }
 
-  const db = adminClient();
+  const db = privilegedDatabase();
   const { data: versoes, error: versoesError } = await db
     .from("arquivos")
     .select("id, versao, ativo")
@@ -224,9 +287,7 @@ export async function subirArquivo(formData: FormData) {
   const versao = (versoes?.[0]?.versao ?? 0) + 1;
   const anteriorAtivo = versoes?.find((item) => item.ativo);
 
-  const nomeLimpo = file.name
-    .replace(/[^a-zA-Z0-9._-]/g, "_")
-    .slice(-180);
+  const nomeLimpo = file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-180);
   const path = `${downloadId}/v${versao}-${nomeLimpo}`;
 
   const buf = Buffer.from(await file.arrayBuffer());
@@ -268,7 +329,7 @@ export async function ativarVersao(formData: FormData) {
   await requireAdmin();
   const arquivoId = positiveInteger(formData.get("arquivo_id"));
   if (!arquivoId) throw new Error("Versão inválida.");
-  const db = adminClient();
+  const db = privilegedDatabase();
   const { data: alvo } = await db
     .from("arquivos")
     .select("id, download_id")

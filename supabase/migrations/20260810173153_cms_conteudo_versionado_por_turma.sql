@@ -1,0 +1,4 @@
+-- Marcador histórico da experiência descartada de CMS versionado.
+-- O projeto remoto chegou a aplicar essa estrutura antes do lançamento, mas
+-- ela foi removida na versão 20260810190311. Em bancos novos, não criamos o
+-- estado transitório: o conteúdo já nasce publicado pelo código.
