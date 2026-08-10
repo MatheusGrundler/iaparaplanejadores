@@ -14,13 +14,28 @@ export default async function MateriaisPage() {
   if (!(await canAccessAdminArea())) return null;
 
   const db = adminClient();
-  const [{ data: cards }, { data: arquivos }] = await Promise.all([
+  const [cardsResult, arquivosResult] = await Promise.all([
     db.from("downloads").select("id, tag, titulo, desc, ordem, modo").order("ordem"),
     db
       .from("arquivos")
       .select("id, download_id, file, versao, nota, ativo, criado_em")
       .order("versao", { ascending: false }),
   ]);
+  const falha = cardsResult.error ?? arquivosResult.error;
+  if (falha) {
+    console.error("Falha ao carregar materiais no admin:", falha.code);
+    return (
+      <main>
+        <h1>Materiais da biblioteca</h1>
+        <div className="card vazio" role="alert">
+          Não foi possível carregar os materiais agora. Nenhuma configuração foi alterada.
+        </div>
+      </main>
+    );
+  }
+
+  const cards = cardsResult.data;
+  const arquivos = arquivosResult.data;
 
   const porCard = new Map<number, NonNullable<typeof arquivos>>();
   for (const a of arquivos ?? []) {
@@ -31,11 +46,12 @@ export default async function MateriaisPage() {
 
   return (
     <main>
-      <h1>Materiais</h1>
+      <h1>Materiais da biblioteca</h1>
       <p className="sub">
-        Cada card aponta pra versão ativa do arquivo. Material no modo &quot;Leitura no app&quot;
-        abre dentro da área (HTML ou PDF) e registra quem leu; &quot;Download&quot; é pra kits e
-        pacotes. Acompanhe em <a href="/admin/leituras">Leituras</a>.
+        O aluno encontra estes cards em <a href="/arquivo">Biblioteca de materiais</a>, na navegação
+        da área de membros. &quot;Leitura no app&quot; abre HTML ou PDF dentro da plataforma;
+        &quot;Download&quot; baixa kits e pacotes no dispositivo. Cada card usa a versão marcada
+        como ativa. Acompanhe as leituras em <a href="/admin/leituras">Leituras</a>.
       </p>
 
       <div className="card" style={{ marginBottom: 24 }}>
@@ -122,6 +138,9 @@ export default async function MateriaisPage() {
               <div>
                 <label>Arquivo (nova versão)</label>
                 <input name="arquivo" type="file" required />
+                <span className="muted">
+                  Leitura no app aceita HTML ou PDF; outros formatos usam Download.
+                </span>
               </div>
               <div>
                 <label>Nota da versão</label>

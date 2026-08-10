@@ -3,7 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { getUserEmail, isAdmin, logEvento } from "@/lib/auth";
 import { normalizeEmail } from "@/lib/access";
+import { aplicarLiberacaoIndividual } from "@/lib/admin-liberacao-etapa";
 import { SEMANA_KEYS } from "@/lib/curso-atividades";
+import { removerMaterialComSeguranca, validarArquivoParaLeitura } from "@/lib/materiais-admin";
 import { privilegedDatabase } from "@/lib/supabase/admin";
 
 const MATERIAL_MAX_BYTES = 50 * 1024 * 1024;
@@ -207,6 +209,50 @@ export async function definirLiberacaoSemana(formData: FormData) {
   revalidatePath("/etapa/[slug]", "page");
 }
 
+export async function definirLiberacaoEtapaAluno(formData: FormData) {
+  const adminEmail = await requireAdmin();
+  const db = privilegedDatabase();
+  const { email, etapaKey, estado } = await aplicarLiberacaoIndividual(formData, {
+    async alunoExiste(alunoEmail) {
+      const { data, error } = await db
+        .from("whitelist")
+        .select("email")
+        .eq("email", alunoEmail)
+        .maybeSingle();
+      assertOk(error, "Validação do aluno");
+      return Boolean(data);
+    },
+    async remover(alunoEmail, chaveEtapa) {
+      const { error } = await db
+        .from("aluno_etapas")
+        .delete()
+        .eq("email", alunoEmail)
+        .eq("etapa_key", chaveEtapa);
+      assertOk(error, "Remoção do ajuste individual da etapa");
+    },
+    async salvar(ajuste) {
+      const { error } = await db.from("aluno_etapas").upsert(
+        {
+          email: ajuste.email,
+          etapa_key: ajuste.etapaKey,
+          liberada: ajuste.liberada,
+          atualizada_em: ajuste.atualizadaEm,
+        },
+        { onConflict: "email,etapa_key" },
+      );
+      assertOk(error, "Atualização do ajuste individual da etapa");
+    },
+  });
+
+  await logEvento(adminEmail, `etapa_aluno_${estado}:${etapaKey}`, undefined, email);
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/semanas");
+  revalidatePath("/");
+  revalidatePath(`/semana/${etapaKey}`);
+  revalidatePath("/etapa/[slug]", "page");
+}
+
 /* ---------- materiais ---------- */
 
 export async function criarCard(formData: FormData) {
@@ -237,8 +283,26 @@ export async function alternarModo(formData: FormData) {
   const id = positiveInteger(formData.get("id"));
   if (!id) throw new Error("Material inválido.");
   const db = privilegedDatabase();
-  const { data: card } = await db.from("downloads").select("modo").eq("id", id).maybeSingle();
-  if (!card) return;
+  const { data: card, error: cardError } = await db
+    .from("downloads")
+    .select("modo")
+    .eq("id", id)
+    .maybeSingle();
+  assertOk(cardError, "Leitura do material");
+  if (!card) throw new Error("Material não encontrado.");
+  if (card.modo === "download") {
+    const { data: arquivo, error: arquivoError } = await db
+      .from("arquivos")
+      .select("file")
+      .eq("download_id", id)
+      .eq("ativo", true)
+      .maybeSingle();
+    assertOk(arquivoError, "Leitura do arquivo ativo");
+    if (!arquivo) {
+      throw new Error("Ative um arquivo HTML ou PDF antes de usar Leitura no app.");
+    }
+    validarArquivoParaLeitura(arquivo.file);
+  }
   const { error } = await db
     .from("downloads")
     .update({ modo: card.modo === "leitura" ? "download" : "leitura" })
@@ -253,15 +317,28 @@ export async function removerCard(formData: FormData) {
   const id = positiveInteger(formData.get("id"));
   if (!id) throw new Error("Material inválido.");
   const db = privilegedDatabase();
-  // apaga os arquivos do storage antes do card
-  const { data: arquivos } = await db.from("arquivos").select("file").eq("download_id", id);
-  const paths = (arquivos ?? []).map((a) => a.file);
-  if (paths.length) {
-    const { error } = await db.storage.from("materiais").remove(paths);
-    assertOk(error, "Remoção dos arquivos");
+  const resultado = await removerMaterialComSeguranca(id, {
+    async listarObjetos(materialId) {
+      // Lista antes da exclusão em cascata apagar os metadados.
+      const { data, error } = await db
+        .from("arquivos")
+        .select("file")
+        .eq("download_id", materialId);
+      assertOk(error, "Leitura dos arquivos do material");
+      return (data ?? []).map((arquivo) => arquivo.file);
+    },
+    async excluirMetadados(materialId) {
+      const { error } = await db.from("downloads").delete().eq("id", materialId);
+      assertOk(error, "Remoção do material");
+    },
+    async removerObjetos(caminhos) {
+      const { error } = await db.storage.from("materiais").remove([...caminhos]);
+      if (error) throw error;
+    },
+  });
+  if (resultado.limpezaStorageFalhou) {
+    console.error("Material removido, mas a limpeza do Storage ficou pendente.");
   }
-  const { error } = await db.from("downloads").delete().eq("id", id);
-  assertOk(error, "Remoção do material");
   revalidatePath("/admin/materiais");
   revalidatePath("/");
 }
@@ -278,6 +355,15 @@ export async function subirArquivo(formData: FormData) {
   }
 
   const db = privilegedDatabase();
+  const { data: card, error: cardError } = await db
+    .from("downloads")
+    .select("modo")
+    .eq("id", downloadId)
+    .maybeSingle();
+  assertOk(cardError, "Leitura do material");
+  if (!card) throw new Error("Material não encontrado.");
+  if (card.modo === "leitura") validarArquivoParaLeitura(file.name);
+
   const { data: versoes, error: versoesError } = await db
     .from("arquivos")
     .select("id, versao, ativo")
@@ -330,18 +416,29 @@ export async function ativarVersao(formData: FormData) {
   const arquivoId = positiveInteger(formData.get("arquivo_id"));
   if (!arquivoId) throw new Error("Versão inválida.");
   const db = privilegedDatabase();
-  const { data: alvo } = await db
+  const { data: alvo, error: alvoError } = await db
     .from("arquivos")
-    .select("id, download_id")
+    .select("id, download_id, file")
     .eq("id", arquivoId)
     .maybeSingle();
-  if (!alvo) return;
-  const { data: anteriorAtivo } = await db
+  assertOk(alvoError, "Leitura da versão");
+  if (!alvo) throw new Error("Versão não encontrada.");
+  const { data: card, error: cardError } = await db
+    .from("downloads")
+    .select("modo")
+    .eq("id", alvo.download_id)
+    .maybeSingle();
+  assertOk(cardError, "Leitura do material");
+  if (!card) throw new Error("Material não encontrado.");
+  if (card.modo === "leitura") validarArquivoParaLeitura(alvo.file);
+
+  const { data: anteriorAtivo, error: anteriorError } = await db
     .from("arquivos")
     .select("id")
     .eq("download_id", alvo.download_id)
     .eq("ativo", true)
     .maybeSingle();
+  assertOk(anteriorError, "Leitura da versão ativa");
   const { error: deactivateError } = await db
     .from("arquivos")
     .update({ ativo: false })

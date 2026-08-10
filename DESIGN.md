@@ -36,6 +36,9 @@ Shell central de até 1080 px, navegação superior e fluxo vertical. Superfíci
 - Conteúdo: composição livre no código, com seções semânticas e navegação interna; o painel não tenta reproduzir um editor de páginas.
 - Construtor de formulários: separar identificação, comportamento, campos e anexos; manter a prévia do aluno visível ao lado quando houver espaço.
 - Prévia administrativa: usar o mesmo renderer do aluno e manter envio e anexos desativados.
+- Liberação de etapas: mostrar primeiro o padrão da turma; exceções individuais usam três estados explícitos — seguir a turma, liberar ou bloquear — e sempre exibem o resultado efetivo.
+- Biblioteca de materiais: distinguir visualmente “Abrir na plataforma” de “Baixar arquivo” e manter o acesso na navegação principal do aluno.
+- Comunidade: editor visual familiar, anexos antes da publicação, progresso de envio e mídia exibida no contexto do post. Imagem, vídeo, áudio e documento precisam ter tratamentos próprios.
 
 ## Motion
 

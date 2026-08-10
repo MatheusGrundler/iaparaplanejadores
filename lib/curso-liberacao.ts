@@ -2,7 +2,11 @@ import "server-only";
 
 import type { MemberIdentity } from "@/lib/auth";
 import type { SemanaKey } from "@/lib/curso-atividades";
-import { mapaLiberacoes, semanaEstaLiberada } from "@/lib/curso-liberacao-regra";
+import {
+  carregarMapaLiberacoesAluno,
+  mapaLiberacoes,
+  semanaEstaLiberada,
+} from "@/lib/curso-liberacao-regra";
 import { privilegedDatabase } from "@/lib/supabase/admin";
 
 export async function carregarLiberacoesSemanas(identity: MemberIdentity) {
@@ -19,19 +23,19 @@ export async function carregarLiberacoesSemanas(identity: MemberIdentity) {
     console.error("Falha ao localizar a turma do aluno:", membroError.code);
     return mapaLiberacoes([]);
   }
-  if (!membro?.turma_id) return mapaLiberacoes([]);
+  if (!membro) return mapaLiberacoes([]);
 
-  const { data, error } = await db
-    .from("turma_semanas")
-    .select("semana_key, liberada")
-    .eq("turma_id", membro.turma_id);
+  const { liberacoes, erro } = await carregarMapaLiberacoesAluno(membro.turma_id, identity.email, {
+    async carregarTurma(turmaId) {
+      return db.from("turma_semanas").select("semana_key, liberada").eq("turma_id", turmaId);
+    },
+    async carregarAluno(email) {
+      return db.from("aluno_etapas").select("etapa_key, liberada").eq("email", email);
+    },
+  });
 
-  if (error) {
-    console.error("Falha ao carregar liberações da turma:", error.code);
-    return mapaLiberacoes([]);
-  }
-
-  return mapaLiberacoes(data ?? []);
+  if (erro) console.error("Falha ao carregar liberações do aluno:", erro);
+  return liberacoes;
 }
 
 export async function podeAcessarSemana(identity: MemberIdentity, semanaKey: SemanaKey) {

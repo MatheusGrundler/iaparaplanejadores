@@ -312,7 +312,10 @@ export function ConstrutorFormulario({
           <div className={styles.sectionHeader}>
             <div>
               <h3 id={`${prefixo}-anexos`}>Anexos</h3>
-              <p>Opcional. Cada campo define formatos, quantidade e tamanho máximo.</p>
+              <p>
+                Opcional. Estes campos recebem arquivos enviados pelo aluno e ficam nas Entregas.
+                Para publicar um material para a turma consultar, use Materiais.
+              </p>
             </div>
             {!somenteLeitura && (
               <button

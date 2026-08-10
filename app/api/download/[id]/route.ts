@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getUserEmail, memberStatus, isAdmin, logEvento } from "@/lib/auth";
+import { OPCOES_DOWNLOAD_ASSINADO } from "@/lib/materiais";
 import { adminClient } from "@/lib/supabase/admin";
 
 function noStore<T extends NextResponse>(response: T): T {
@@ -70,7 +71,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
   const { data: signed, error } = await db.storage
     .from("materiais")
-    .createSignedUrl(arquivo.file, 60);
+    .createSignedUrl(arquivo.file, 60, OPCOES_DOWNLOAD_ASSINADO);
 
   if (error || !signed) {
     return errorResponse("falha ao assinar", 500);

@@ -15,4 +15,6 @@ Não aplique a baseline por cima. Primeiro rode `npx supabase migration list`, c
 
 O histórico remoto foi reconciliado em `20260810190210_reconciliar_historico_quests_e_anexos.sql`. No projeto remoto, a versão `20260810190311_remover_cms_conteudo.sql` removeu o antigo CMS preservando acesso, liberações, respostas, anexos, dúvidas, materiais e leituras. Na cadeia local ela é um marcador: a versão anterior do CMS também é um marcador, então bancos novos nunca criam esse estado transitório.
 
-Depois de qualquer alteração, execute o Security Advisor e o Performance Advisor no painel e confira que o bucket `materiais` continua privado.
+`20260810212036_liberacao_etapas_por_aluno.sql` acrescenta exceções individuais sobre o padrão da turma. `20260810212044_comunidade_rica_com_anexos.sql` adiciona publicações ricas e o bucket privado `comunidade-anexos`.
+
+Depois de qualquer alteração, execute o Security Advisor e o Performance Advisor no painel e confira que os buckets `materiais`, `quest-anexos`, `duvidas` e `comunidade-anexos` continuam privados.

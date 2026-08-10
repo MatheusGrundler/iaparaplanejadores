@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import DuvidaModal from "@/app/componentes/DuvidaModal";
+import { mensagemVeioDoMaterial } from "@/lib/materiais";
 
 /**
  * Leitor de material dentro do app.
@@ -26,6 +27,7 @@ export default function Leitor({ id, titulo, statusInicial }: Props) {
   const [salvando, setSalvando] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
   const pendentes = useRef(0);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const enviar = useCallback(
     (payload: Record<string, unknown>, beacon = false) => {
@@ -51,7 +53,9 @@ export default function Leitor({ id, titulo, statusInicial }: Props) {
     // Materiais interativos (ex.: canvas da Semana 0) mandam as respostas
     // via postMessage; daqui elas seguem pro registro de leitura.
     const aoMensagem = (e: MessageEvent) => {
-      if (e.origin !== window.location.origin) return;
+      // Com a origem isolada, o material roda num origin opaco (`null`). A
+      // referência da janela garante que só o iframe deste leitor é aceito.
+      if (!mensagemVeioDoMaterial(e, iframeRef.current?.contentWindow)) return;
       const d = e.data as { iappRespostas?: unknown } | null;
       if (
         d &&
@@ -137,8 +141,8 @@ export default function Leitor({ id, titulo, statusInicial }: Props) {
             flexWrap: "wrap",
           }}
         >
-          <Link href="/" className="btn btn-fantasma btn-mini">
-            ← Conteúdos
+          <Link href="/arquivo" className="btn btn-fantasma btn-mini">
+            ← Materiais
           </Link>
           <strong>{titulo}</strong>
           {rotulo && <span className="pill">{rotulo}</span>}
@@ -187,9 +191,10 @@ export default function Leitor({ id, titulo, statusInicial }: Props) {
       )}
 
       <iframe
+        ref={iframeRef}
         src={`/api/material/${id}`}
         title={titulo}
-        sandbox="allow-scripts allow-same-origin allow-popups"
+        sandbox="allow-scripts allow-popups"
         style={{
           width: "100%",
           height: "calc(100vh - 170px)",

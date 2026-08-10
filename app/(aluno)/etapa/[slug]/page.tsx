@@ -4,7 +4,8 @@ import Formulario from "@/app/componentes/curso/Formulario";
 import { conteudoNativoPorKey } from "@/app/componentes/curso/conteudos";
 import { getMemberIdentity } from "@/lib/auth";
 import { SEMANA_KEYS, type SemanaKey } from "@/lib/curso-atividades";
-import { carregarLiberacoesSemanas, podeAcessarSemana } from "@/lib/curso-liberacao";
+import { carregarLiberacoesSemanas } from "@/lib/curso-liberacao";
+import { semanaEstaLiberada } from "@/lib/curso-liberacao-regra";
 import { chaveEtapaDoSlug, slugPublicoEtapa } from "@/lib/curso-nomenclatura";
 
 export const dynamic = "force-dynamic";
@@ -29,13 +30,13 @@ export default async function EtapaPage({ params }: Props) {
 
   const identity = await getMemberIdentity();
   if (!identity) return null;
-  if (!(await podeAcessarSemana(identity, chave))) {
+  const liberacoes = await carregarLiberacoesSemanas(identity);
+  if (!semanaEstaLiberada(liberacoes, chave)) {
     redirect(`/?etapa-bloqueada=${slugCanonico}`);
   }
 
   const conteudo = conteudoNativoPorKey(chave);
   const Componente = conteudo.componente;
-  const liberacoes = await carregarLiberacoesSemanas(identity);
   const indice = SEMANA_KEYS.indexOf(chave);
   const anteriorKey = SEMANA_KEYS.slice(0, indice)
     .reverse()

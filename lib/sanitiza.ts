@@ -1,9 +1,9 @@
 import "server-only";
 import sanitizeHtml from "sanitize-html";
 
-/** Sanitiza o HTML do editor (dúvida do aluno e resposta do admin). */
-export function sanitizaRico(html: string): string {
-  const limpo = sanitizeHtml(String(html ?? "").slice(0, 20000), {
+/** Sanitiza o HTML do editor (dúvida do aluno, comunidade e resposta do admin). */
+export function sanitizaRico(html: string, limite = 20000): string {
+  const limpo = sanitizeHtml(String(html ?? "").slice(0, limite), {
     allowedTags: [
       "p",
       "br",
@@ -20,6 +20,8 @@ export function sanitizaRico(html: string): string {
       "code",
       "pre",
       "blockquote",
+      "h2",
+      "h3",
     ],
     allowedAttributes: { a: ["href"] },
     allowedSchemes: ["http", "https", "mailto"],

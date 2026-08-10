@@ -3,7 +3,7 @@
 App Next.js (App Router + TypeScript) que reúne TUDO num único deploy da Vercel:
 
 - **Landing de vendas pública** na raiz `/` (anônimo vê `public/landing.html` via rewrite do middleware; o formulário de inscrição envia por `/api/inscricao` com SMTP Titan — env `SMTP_USER`/`SMTP_PASS`).
-- **Área do aluno** na mesma raiz `/` depois do login, com uma trilha formada por Preparação + Etapas, progresso, Quests, anexos privados e dúvidas.
+- **Área do aluno** na mesma raiz `/` depois do login, com trilha, Biblioteca de materiais e Comunidade rica com anexos.
 - **Administração** em `/admin` (formulários, liberação das Etapas, alunos, materiais e entregas).
 
 Pra editar a landing: mexe em `05 - Vendas e landing/landing.html` no projeto de conteúdo e copia pra `public/landing.html` aqui. A pasta `site/` do projeto de conteúdo (deploy estático antigo) ficou obsoleta com a fusão.
@@ -38,13 +38,21 @@ O esquema esperado está versionado em `supabase/migrations/`. Para um projeto n
 - O conteúdo pode usar qualquer composição React/HTML. Não existe mais editor ou snapshot de conteúdo no banco.
 - Quests e Dúvidas compartilham o mesmo renderer e são incorporadas em qualquer ponto da página com `<Formulario codigo="quest-etapa-1" />`.
 - `/admin/formularios` cria rascunhos, campos, anexos e versões publicadas. A prévia usa o mesmo componente do aluno sem gravar dados.
-- `/admin/semanas` controla somente quais Etapas cada turma pode abrir. As chaves `semana-*` permanecem como identificadores técnicos; a interface usa `Preparação` e `Etapa`.
+- `/admin/semanas` define o padrão de cada turma e também exceções por aluno. Uma exceção individual pode liberar ou bloquear uma Etapa e sempre prevalece sobre a turma.
 - As respostas, os anexos, as dúvidas e a versão exata do formulário enviado continuam no Supabase. Somente o conteúdo editorial voltou para o código.
+
+## Materiais, anexos e comunidade
+
+- Materiais publicados em `/admin/materiais` aparecem para o aluno em `/arquivo`, identificado na interface como **Biblioteca de materiais**. O menu principal mantém essa área sempre visível.
+- Cards no modo **Leitura na plataforma** abrem HTML/PDF no leitor isolado; cards no modo **Download** passam pela rota privada que registra o evento e assina o arquivo por 60 segundos.
+- Anexos configurados no construtor de formulários têm outro objetivo: recebem arquivos do aluno e aparecem para o administrador em **Entregas**. Eles não viram material público.
+- A Comunidade aceita texto formatado, imagens, vídeos, áudios e documentos. Arquivos pequenos usam upload assinado; acima de 6 MB o envio é retomável e mostra progresso.
+- O bucket `comunidade-anexos` é privado. O feed recebe somente URLs temporárias e só exibe anexos confirmados pelo servidor.
 
 ## Deploy na Vercel
 
 1. Mantenha esta pasta em um repositório privado e importe-o na Vercel.
-2. Use Node.js `>= 20.9` (LTS recomendado) e `npm ci` no build.
+2. Use Node.js `>= 22` (LTS recomendado) e `npm ci` no build.
 3. Configure as variáveis:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
@@ -78,7 +86,7 @@ O esquema esperado está versionado em `supabase/migrations/`. Para um projeto n
 ## Limites conhecidos antes de produção
 
 - O app ainda não tem suíte end-to-end nem monitoramento externo. O teste manual de login, expiração, upload e download continua obrigatório no ambiente de staging.
-- A comunidade é simples e não substitui moderação, exportação ou política formal de retenção de dados.
+- A comunidade ainda não tem comentários, moderação em lote, exportação ou política formal de retenção de dados.
 
 ## Estrutura
 
@@ -87,7 +95,8 @@ app/
   login/               e-mail + link mágico
   auth/confirm         troca o token do link por sessão e registra o login
   auth/signout         encerra a sessão
-  (aluno)/             trilha, conteúdos e comunidade, com gate de membro
+  (aluno)/             trilha, conteúdos, Biblioteca e comunidade, com gate de membro
+  api/comunidade/      rascunhos, publicação e uploads privados da comunidade
   api/download/[id]    download com evento e URL assinada
   admin/               formulários, liberações e operação, com gate de admin
   componentes/curso/   páginas de conteúdo nativas + componente de incorporação

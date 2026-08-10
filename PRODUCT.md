@@ -10,9 +10,11 @@ Planejadores financeiros brasileiros, em especial assinantes da Planfi, com perf
 
 ## Product Purpose
 
-A plataforma conduz a imersão IA para Planejadores por uma trilha formada por uma Preparação e quatro Etapas. Ela reúne conteúdo, progresso, Quests, anexos privados, dúvidas e devolutivas por usuário. O administrador controla a liberação de cada Etapa para respeitar o ciclo conteúdo, Quest, live e próxima Etapa.
+A plataforma conduz a imersão IA para Planejadores por uma trilha formada por uma Preparação e quatro Etapas. Ela reúne conteúdo, progresso, Quests, anexos privados, dúvidas, materiais e comunidade. O administrador controla a liberação de cada Etapa por turma e pode criar uma exceção para um aluno específico, sem precisar movê-lo de turma.
 
 O conteúdo editorial vive no código como componentes React/HTML, o que permite composições livres por página. Quests e Dúvidas usam um construtor separado e são incorporadas por código; suas versões publicadas permanecem estáveis para que cada resposta continue ligada ao formulário que o aluno realmente viu.
+
+A Biblioteca concentra materiais publicados pelo administrador. Na Comunidade, o aluno escreve com formatação visual e pode compartilhar imagens, vídeos, áudios e documentos; os arquivos ficam privados e são exibidos no próprio post por URLs temporárias.
 
 A landing pública usa o registro de marca como exceção; o padrão deste app autenticado é produto.
 
@@ -33,7 +35,7 @@ Honesta, humana e competente. A comunicação é direta, natural e sem hype, com
 1. Uma ação principal clara por tela.
 2. Estado e disponibilidade sempre explícitos.
 3. Menos explicação, mais orientação operacional.
-4. O aluno só acessa o que o administrador liberou.
+4. O aluno só acessa o que a turma ou uma exceção individual liberou.
 5. Honestidade e segurança fazem parte da interface, não de notas escondidas.
 6. Conteúdo e coleta são independentes: a página pode evoluir livremente sem perder o histórico das respostas.
 

@@ -78,12 +78,13 @@ export async function canAccessAdminArea(): Promise<boolean> {
   return Boolean(email && (await isAdmin(email)));
 }
 
-export async function logEvento(email: string, tipo: string, ref?: number) {
+export async function logEvento(email: string, tipo: string, ref?: number, alvo?: string) {
   const admin = adminClient();
   const { error } = await admin.from("eventos").insert({
     email: normalizeEmail(email),
     tipo,
     ref: ref ?? null,
+    alvo: alvo?.trim() || null,
   });
   if (error) console.error("Falha ao registrar evento:", error.code);
 }

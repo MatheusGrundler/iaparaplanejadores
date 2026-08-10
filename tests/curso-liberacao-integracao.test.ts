@@ -1,12 +1,6 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import test from "node:test";
-
-const raiz = new URL("../", import.meta.url);
-
-async function fonte(caminho: string) {
-  return readFile(new URL(caminho, raiz), "utf8");
-}
+import { fonteRepositorio as fonte } from "./fixtures/fonte-repositorio";
 
 function ocorrencias(texto: string, trecho: string) {
   return texto.split(trecho).length - 1;
@@ -22,7 +16,8 @@ test("dashboard usa o registro em código e as liberações simples da turma", a
   assert.match(dashboard, /carregarLiberacoesSemanas/);
   assert.doesNotMatch(dashboard, /carregarTrilhaDoMembro|turma_etapas/);
   assert.doesNotMatch(dashboard, /href=["']\/arquivo["']/);
-  assert.doesNotMatch(layout, /href=["']\/arquivo["']/);
+  assert.match(layout, /href=["']\/arquivo["']/);
+  assert.match(layout, /Biblioteca de materiais/);
 });
 
 test("endereço direto e todas as mutações conferem a liberação pelo formulário", async () => {
@@ -35,7 +30,8 @@ test("endereço direto e todas as mutações conferem a liberação pelo formul�
     fonte("lib/formularios/server.ts"),
   ]);
 
-  assert.match(pagina, /podeAcessarSemana\(identity, chave\)/);
+  assert.match(pagina, /carregarLiberacoesSemanas\(identity\)/);
+  assert.match(pagina, /semanaEstaLiberada\(liberacoes, chave\)/);
   assert.match(pagina, /etapa-bloqueada=\$\{slugCanonico\}/);
   assert.match(paginaLegada, /redirect\(`\/etapa\//);
   assert.ok(ocorrencias(atividade, "await resolverQuestDoUsuario(") >= 1);
@@ -81,18 +77,26 @@ test("URLs antigas convergem para a rota canônica sem expor a chave interna", a
 });
 
 test("admin controla turma_semanas e a cadeia nova não recria o CMS", async () => {
-  const [pagina, acoes, controle, cms, remocao] = await Promise.all([
+  const [pagina, acoes, controle, individual, cms, remocao] = await Promise.all([
     fonte("app/admin/semanas/page.tsx"),
     fonte("app/admin/actions.ts"),
     fonte("supabase/migrations/20260810173132_controle_liberacao_etapas_por_turma.sql"),
+    fonte("supabase/migrations/20260810212036_liberacao_etapas_por_aluno.sql"),
     fonte("supabase/migrations/20260810173153_cms_conteudo_versionado_por_turma.sql"),
     fonte("supabase/migrations/20260810190311_remover_cms_conteudo.sql"),
   ]);
 
   assert.match(pagina, /Liberação das etapas/);
   assert.match(pagina, /definirLiberacaoSemana/);
+  assert.match(pagina, /definirLiberacaoEtapaAluno/);
   assert.match(acoes, /\.from\("turma_semanas"\)/);
+  assert.match(acoes, /\.from\("aluno_etapas"\)/);
   assert.match(controle, /create table public\.turma_semanas/);
+  assert.match(individual, /create table public\.aluno_etapas/);
+  assert.match(individual, /references public\.whitelist\(email\)/);
+  assert.match(individual, /add column if not exists alvo text/);
+  assert.match(acoes, /etapa_aluno_\$\{estado\}:[\s\S]*undefined, email/);
+  assert.match(individual, /aluno_etapas[\s\S]*turma_semanas[\s\S]*false/);
   assert.doesNotMatch(
     cms,
     /create table public\.(curso_conteudos|curso_conteudo_versoes|turma_etapas)/,
