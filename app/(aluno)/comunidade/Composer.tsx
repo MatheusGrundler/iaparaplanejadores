@@ -82,7 +82,7 @@ export function endpointTus() {
   if (url.hostname.endsWith(".supabase.co") && !url.hostname.endsWith(".storage.supabase.co")) {
     url.hostname = url.hostname.replace(/\.supabase\.co$/, ".storage.supabase.co");
   }
-  url.pathname = "/storage/v1/upload/resumable";
+  url.pathname = "/storage/v1/upload/resumable/sign";
   url.search = "";
   url.hash = "";
   return url.toString();
@@ -243,7 +243,11 @@ export default function Composer() {
         if (inputRef.current) inputRef.current.value = "";
         return;
       }
-      validados.push({ arquivo, mime: validacao.mime, tipo: validacao.regra.tipo });
+      validados.push({
+        arquivo,
+        mime: validacao.mime,
+        tipo: validacao.regra.tipo,
+      });
     }
     const novos: AnexoLocal[] = validados.map(({ arquivo, mime, tipo }) => ({
       id: crypto.randomUUID(),
@@ -324,7 +328,11 @@ export default function Composer() {
     const confirmacao = await fetch(endpoint, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ path: body.path, mime, bytes: anexo.arquivo.size }),
+      body: JSON.stringify({
+        path: body.path,
+        mime,
+        bytes: anexo.arquivo.size,
+      }),
     });
     const confirmacaoBody = await respostaJson(confirmacao);
     if (!confirmacao.ok || !confirmacaoBody?.ok) {
@@ -347,9 +355,9 @@ export default function Composer() {
         }),
       ),
     );
-    await fetch(`/api/comunidade/publicacoes/${publicacaoId}`, { method: "DELETE" }).catch(
-      () => undefined,
-    );
+    await fetch(`/api/comunidade/publicacoes/${publicacaoId}`, {
+      method: "DELETE",
+    }).catch(() => undefined);
   }
 
   async function publicar(evento: FormEvent<HTMLFormElement>) {

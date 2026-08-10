@@ -10,6 +10,7 @@ import type { PrivilegedDatabase } from "@/lib/supabase/admin";
 const CABECALHO_MAX_BYTES = 4096;
 const CAUDA_ZIP_MAX_BYTES = 65_557;
 const DIRETORIO_CENTRAL_MAX_BYTES = 2 * 1024 * 1024;
+const LEITURA_STORAGE_TIMEOUT_MS = 15_000;
 
 function inteiro16(bytes: Uint8Array, indice: number) {
   return bytes[indice] | (bytes[indice + 1] << 8);
@@ -31,27 +32,38 @@ async function lerIntervaloDoObjeto(
   fim: number,
 ): Promise<Uint8Array | null> {
   const maximo = fim - inicio + 1;
-  let resposta: Response;
-  try {
-    resposta = await fetch(url, {
-      cache: "no-store",
-      headers: { Range: `bytes=${inicio}-${fim}` },
-    });
-  } catch {
-    return null;
-  }
-  if (![200, 206].includes(resposta.status) || !resposta.body) return null;
-  // Uma resposta 200 a um Range que começa no meio do arquivo contém bytes
-  // errados para esse intervalo. Cancelamos cedo, sem baixar o objeto inteiro.
-  if (inicio > 0 && resposta.status !== 206) {
-    await resposta.body.cancel().catch(() => undefined);
+  if (
+    !Number.isSafeInteger(inicio) ||
+    !Number.isSafeInteger(fim) ||
+    inicio < 0 ||
+    maximo < 1 ||
+    maximo > DIRETORIO_CENTRAL_MAX_BYTES
+  ) {
     return null;
   }
 
-  const reader = resposta.body.getReader();
-  const partes: Uint8Array[] = [];
-  let total = 0;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), LEITURA_STORAGE_TIMEOUT_MS);
+  let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+
   try {
+    // O signal também faz o Next ignorar o dedupe de GET. Sem ele, o Next
+    // cria uma segunda branch do stream e reader.cancel() pode nunca concluir.
+    const resposta = await fetch(url, {
+      cache: "no-store",
+      headers: { Range: `bytes=${inicio}-${fim}` },
+      signal: controller.signal,
+    });
+
+    if (![200, 206].includes(resposta.status) || !resposta.body) return null;
+    // Uma resposta 200 a um Range que começa no meio do arquivo contém bytes
+    // errados para esse intervalo. O abort no finally encerra o corpo sem
+    // baixar o restante do objeto.
+    if (inicio > 0 && resposta.status !== 206) return null;
+
+    reader = resposta.body.getReader();
+    const partes: Uint8Array[] = [];
+    let total = 0;
     while (total < maximo) {
       const { value, done } = await reader.read();
       if (done) break;
@@ -61,17 +73,23 @@ async function lerIntervaloDoObjeto(
       partes.push(parte);
       total += parte.length;
     }
-  } finally {
-    await reader.cancel().catch(() => undefined);
-  }
 
-  const bytes = new Uint8Array(total);
-  let cursor = 0;
-  for (const parte of partes) {
-    bytes.set(parte, cursor);
-    cursor += parte.length;
+    const bytes = new Uint8Array(total);
+    let cursor = 0;
+    for (const parte of partes) {
+      bytes.set(parte, cursor);
+      cursor += parte.length;
+    }
+    return bytes;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+    controller.abort();
+    // O resultado já foi limitado e copiado. Não esperamos o cancelamento da
+    // stream porque uma implementação defeituosa não pode travar a publicação.
+    if (reader) void reader.cancel().catch(() => undefined);
   }
-  return bytes;
 }
 
 function indiceAssinaturaReversa(bytes: Uint8Array, assinatura: readonly number[]) {

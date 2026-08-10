@@ -124,20 +124,30 @@ test("endpoint e envio TUS usam host do Storage, progresso, retry e propagam fal
   process.env.NEXT_PUBLIC_SUPABASE_URL = "https://projeto.supabase.co/rest/v1?x=1#hash";
   assert.equal(
     composer.endpointTus(),
-    "https://projeto.storage.supabase.co/storage/v1/upload/resumable",
+    "https://projeto.storage.supabase.co/storage/v1/upload/resumable/sign",
   );
-  process.env.NEXT_PUBLIC_SUPABASE_URL = "https://local.supabase.test/base";
-  assert.equal(composer.endpointTus(), "https://local.supabase.test/storage/v1/upload/resumable");
+  process.env.NEXT_PUBLIC_SUPABASE_URL =
+    "https://projeto.storage.supabase.co/outro/caminho?token=ignorado#fragmento";
+  assert.equal(
+    composer.endpointTus(),
+    "https://projeto.storage.supabase.co/storage/v1/upload/resumable/sign",
+  );
+  process.env.NEXT_PUBLIC_SUPABASE_URL = "https://local.supabase.test/base?x=1#hash";
+  assert.equal(
+    composer.endpointTus(),
+    "https://local.supabase.test/storage/v1/upload/resumable/sign",
+  );
   delete process.env.NEXT_PUBLIC_SUPABASE_URL;
   assert.throws(() => composer.endpointTus(), /não está configurado/);
 
   process.env.NEXT_PUBLIC_SUPABASE_URL = "https://projeto.supabase.co";
   definirRuntimeComunidade({ tusSimularRetry: true });
   const atualizacoes: Array<[number, number | undefined]> = [];
+  const assinaturaOpaca = "assinatura.opaca-Com_=/+%25";
   await composer.enviarComTus(
     new File(["arquivo"], "grande.pdf", { type: "application/pdf" }),
     "usuario/1/anexo.pdf",
-    "token-assinado",
+    assinaturaOpaca,
     "application/pdf",
     (progresso, tentativa) => atualizacoes.push([progresso, tentativa]),
   );
@@ -148,8 +158,12 @@ test("endpoint e envio TUS usam host do Storage, progresso, retry e propagam fal
   ]);
   assert.equal(runtimeComunidade().tusInicios, 1);
   assert.deepEqual(runtimeComunidade().tusOpcoes?.headers, {
-    "x-signature": "token-assinado",
+    "x-signature": assinaturaOpaca,
   });
+  assert.equal(
+    (runtimeComunidade().tusOpcoes?.headers as Record<string, string>).Authorization,
+    undefined,
+  );
   assert.deepEqual(runtimeComunidade().tusOpcoes?.metadata, {
     bucketName: "comunidade-anexos",
     objectName: "usuario/1/anexo.pdf",

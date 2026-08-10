@@ -40,10 +40,11 @@ test("upload usa PUT assinado até 6 MB e TUS direto e resumível acima disso", 
   assert.match(composer, /const LIMITE_PUT = 6 \* 1024 \* 1024/);
   assert.match(composer, /anexo\.arquivo\.size > LIMITE_PUT/);
   assert.match(composer, /\.storage\.supabase\.co/);
-  assert.match(composer, /\/storage\/v1\/upload\/resumable/);
+  assert.match(composer, /url\.pathname = "\/storage\/v1\/upload\/resumable\/sign"/);
   assert.match(composer, /chunkSize: LIMITE_PUT/);
   assert.match(composer, /uploadDataDuringCreation: true/);
   assert.match(composer, /headers: \{ "x-signature": token \}/);
+  assert.doesNotMatch(composer, /headers:\s*\{[^}]*authorization[^}]*\}/i);
   assert.match(composer, /bucketName: BUCKET_COMUNIDADE/);
   assert.match(composer, /contentType: mime/);
   assert.match(composer, /onShouldRetry/);
@@ -58,7 +59,10 @@ test("publicação segue rascunho, anexos, confirmação, publicação e limpeza
   assert.match(composer, /body: JSON\.stringify\(\{ html:/);
   assert.match(composer, /`\/api\/comunidade\/publicacoes\/\$\{publicacaoId\}\/anexos`/);
   assert.match(composer, /nome: anexo\.arquivo\.name/);
-  assert.match(composer, /body: JSON\.stringify\(\{ path: body\.path, mime, bytes:/);
+  assert.match(
+    composer,
+    /body:\s*JSON\.stringify\(\{\s*path:\s*body\.path,\s*mime,\s*bytes:\s*anexo\.arquivo\.size,\s*\}\)/,
+  );
   assert.match(composer, /method: "PATCH"/);
   assert.match(composer, /method: "DELETE"/);
   assert.match(composer, /Promise\.allSettled/);

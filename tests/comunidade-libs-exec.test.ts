@@ -47,7 +47,9 @@ function identidade(parcial: Partial<IdentidadeMock> = {}): IdentidadeMock {
 }
 
 test("conteúdo rico é sanitizado e distingue vazio, limite e texto longo", () => {
-  assert.deepEqual(conteudo.prepararConteudoComunidade(null), { erro: "Conteúdo inválido." });
+  assert.deepEqual(conteudo.prepararConteudoComunidade(null), {
+    erro: "Conteúdo inválido.",
+  });
   assert.match(conteudo.prepararConteudoComunidade("x".repeat(50_001)).erro ?? "", /longo/);
 
   const vazio = conteudo.prepararConteudoComunidade("<p> </p>");
@@ -175,7 +177,10 @@ test("contexto de edição valida id, sessão, banco e autoria UUID ou legada", 
 
   definirRuntimeComunidade({
     identity: identidade(),
-    db: consultaPost({ data: { ...post, user_id: null, email: "aluno@example.com" }, error: null }),
+    db: consultaPost({
+      data: { ...post, user_id: null, email: "aluno@example.com" },
+      error: null,
+    }),
   });
   assert.equal(servidor.contextoFalhou(await servidor.contextoPublicacaoEditavel("1")), false);
 });
@@ -194,7 +199,10 @@ function dbStorage(opcoes: {
           },
           async createSignedUrl() {
             return (
-              opcoes.signed ?? { data: { signedUrl: "https://storage.test/anexo" }, error: null }
+              opcoes.signed ?? {
+                data: { signedUrl: "https://storage.test/anexo" },
+                error: null,
+              }
             );
           },
         };
@@ -223,7 +231,9 @@ test("validação do Storage falha fechada e confere metadado mais magic bytes",
   );
   assert.deepEqual(
     await validar(
-      dbStorage({ info: { data: { size: 9, contentType: "image/png" }, error: null } }),
+      dbStorage({
+        info: { data: { size: 9, contentType: "image/png" }, error: null },
+      }),
       "x",
       "image/png",
       8,
@@ -252,7 +262,12 @@ test("validação do Storage falha fechada e confere metadado mais magic bytes",
       }),
   );
   const valido = await validar(
-    dbStorage({ info: { data: { metadata: { size: 8, mimetype: "image/png" } }, error: null } }),
+    dbStorage({
+      info: {
+        data: { metadata: { size: 8, mimetype: "image/png" } },
+        error: null,
+      },
+    }),
     "x",
     "image/png",
     8,
@@ -271,7 +286,9 @@ test("validação do Storage falha fechada e confere metadado mais magic bytes",
   );
   assert.deepEqual(
     await validar(
-      dbStorage({ info: { data: { size: 5_000, contentType: "image/png" }, error: null } }),
+      dbStorage({
+        info: { data: { size: 5_000, contentType: "image/png" }, error: null },
+      }),
       "x",
       "image/png",
       5_000,
@@ -284,13 +301,98 @@ test("validação do Storage falha fechada e confere metadado mais magic bytes",
   fetchMock.mock.mockImplementation(async () => new Response("não é png", { status: 200 }));
   assert.deepEqual(
     await validar(
-      dbStorage({ info: { data: { size: 8, contentType: "image/png" }, error: null } }),
+      dbStorage({
+        info: { data: { size: 8, contentType: "image/png" }, error: null },
+      }),
       "x",
       "image/png",
       8,
     ),
     { valido: false, erroTecnico: false },
   );
+});
+
+test("validação do Storage não espera o cancelamento de uma stream aberta do Next", async () => {
+  const cabecalho = new Uint8Array(4_096);
+  cabecalho.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  let cancelamentos = 0;
+  let initCapturado: RequestInit | undefined;
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(cabecalho);
+    },
+    cancel() {
+      cancelamentos += 1;
+      return new Promise<void>(() => undefined);
+    },
+  });
+
+  mock.method(globalThis, "fetch", async (_url: string | URL | Request, init?: RequestInit) => {
+    initCapturado = init;
+    return new Response(stream, { status: 206 });
+  });
+
+  const expirou = Symbol("a validação ficou presa no cancelamento");
+  const resultado = await Promise.race([
+    storage.validarObjetoComunidade(
+      dbStorage({
+        info: { data: { size: 5_000, contentType: "image/png" }, error: null },
+      }) as never,
+      "video-com-cabecalho-png",
+      "image/png",
+      5_000,
+    ),
+    new Promise<typeof expirou>((resolve) => setImmediate(() => resolve(expirou))),
+  ]);
+
+  assert.notEqual(resultado, expirou);
+  assert.deepEqual(resultado, { valido: true, erroTecnico: false });
+  assert.equal(cancelamentos, 1);
+  assert.equal(new Headers(initCapturado?.headers).get("Range"), "bytes=0-4095");
+  assert.ok(initCapturado?.signal instanceof AbortSignal);
+});
+
+test("validação do Storage aborta leitura travada e retorna falha técnica", async () => {
+  let dispararTimeout: (() => void) | undefined;
+  let signalCapturado: AbortSignal | null | undefined;
+  const setTimeoutMock = mock.method(globalThis, "setTimeout", ((
+    callback: (...args: unknown[]) => void,
+    atraso?: number,
+  ) => {
+    assert.equal(atraso, 15_000);
+    dispararTimeout = () => callback();
+    return 0 as unknown as ReturnType<typeof setTimeout>;
+  }) as unknown as typeof setTimeout);
+  const fetchMock = mock.method(
+    globalThis,
+    "fetch",
+    async (_url: string | URL | Request, init?: RequestInit) => {
+      signalCapturado = init?.signal;
+      assert.ok(signalCapturado);
+      queueMicrotask(() => dispararTimeout?.());
+      return await new Promise<Response>((_resolve, reject) => {
+        signalCapturado?.addEventListener("abort", () => reject(signalCapturado?.reason), {
+          once: true,
+        });
+      });
+    },
+  );
+
+  const resultado = await storage.validarObjetoComunidade(
+    dbStorage({
+      info: { data: { size: 5_000, contentType: "image/png" }, error: null },
+    }) as never,
+    "leitura-travada.png",
+    "image/png",
+    5_000,
+  );
+
+  assert.deepEqual(resultado, { valido: false, erroTecnico: true });
+  assert.equal(setTimeoutMock.mock.callCount(), 1);
+  assert.equal(fetchMock.mock.callCount(), 1);
+  assert.equal(signalCapturado?.aborted, true);
+  const init = fetchMock.mock.calls[0]?.arguments[1];
+  assert.equal(new Headers(init?.headers).get("Range"), "bytes=0-4095");
 });
 
 function zipOoxmlMinimo(nomes: string[]) {
@@ -356,11 +458,17 @@ test("OOXML exige diretório central coerente, Content Types e raiz do formato",
     assert.ok(range);
     return new Response(zipErrado.slice(Number(range[1]), Number(range[2]) + 1), { status: 206 });
   });
-  assert.deepEqual(await validar(zipErrado), { valido: false, erroTecnico: false });
+  assert.deepEqual(await validar(zipErrado), {
+    valido: false,
+    erroTecnico: false,
+  });
 
   const zipFalso = Uint8Array.from([0x50, 0x4b, 0x03, 0x04]);
   fetchMock.mock.mockImplementation(async () => new Response(zipFalso, { status: 206 }));
-  assert.deepEqual(await validar(zipFalso), { valido: false, erroTecnico: false });
+  assert.deepEqual(await validar(zipFalso), {
+    valido: false,
+    erroTecnico: false,
+  });
 });
 
 function dbFila(opcoes: {
@@ -466,7 +574,10 @@ test("assinatura do feed usa lotes de 100, seis horas e registra falhas parciais
   assert.equal(resultado.anexos.length, 204);
   assert.match(resultado.anexos[0].downloadUrl ?? "", /download=Documento\+0\.pdf/);
   assert.deepEqual(
-    await feed.assinarAnexosComunidade([], async () => ({ data: [], error: null })),
+    await feed.assinarAnexosComunidade([], async () => ({
+      data: [],
+      error: null,
+    })),
     {
       anexos: [],
       houveErro: false,
