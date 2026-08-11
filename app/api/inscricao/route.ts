@@ -2,11 +2,10 @@ import { NextResponse, type NextRequest } from "next/server";
 import nodemailer from "nodemailer";
 
 /**
- * Recebe a inscrição da landing (pública) e envia por SMTP (Titan/HostGator).
- * Variáveis de ambiente (Vercel): SMTP_USER e SMTP_PASS obrigatórias;
- * SMTP_HOST (padrão smtp.titan.email), SMTP_PORT (padrão 465) e
- * DESTINO_EMAIL opcionais. Backup: toda inscrição válida vai pro log
- * ("INSCRICAO"), mesmo se o e-mail falhar.
+ * Recebe o interesse vindo da landing e envia por SMTP.
+ * Funciona com o Email Sandbox do Mailtrap (testes) e com qualquer provedor SMTP.
+ * SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS e SMTP_FROM devem ser configuradas;
+ * DESTINO_EMAIL define quem recebe os novos interesses.
  */
 
 function limpa(v: unknown, max: number) {
@@ -32,6 +31,7 @@ export async function POST(req: NextRequest) {
   const nome = limpa(body.nome, 120);
   const email = limpa(body.email, 160);
   const whatsapp = limpa(body.whatsapp, 20);
+  const querMentoria = body.querMentoria === true;
   const honeypot = String(body.empresa ?? "").trim();
   const segundos = Number(body.segundos) || 0;
 
@@ -48,43 +48,45 @@ export async function POST(req: NextRequest) {
 
   console.log(
     "INSCRICAO",
-    JSON.stringify({ nome, email, whatsapp, quando: new Date().toISOString() }),
+    JSON.stringify({ nome, email, whatsapp, querMentoria, quando: new Date().toISOString() }),
   );
 
   const user = process.env.SMTP_USER;
   const pass = process.env.SMTP_PASS;
-  if (!user || !pass) {
-    console.error("SMTP nao configurado: defina SMTP_USER e SMTP_PASS.");
+  const from = process.env.SMTP_FROM;
+  if (!user || !pass || !from) {
+    console.error("SMTP nao configurado: defina SMTP_USER, SMTP_PASS e SMTP_FROM.");
     return noStore(
       NextResponse.json({ ok: false, error: "smtp-nao-configurado" }, { status: 503 }),
     );
   }
 
-  const port = Number(process.env.SMTP_PORT || 465);
+  const port = Number(process.env.SMTP_PORT || 587);
   const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || "smtp.titan.email",
+    host: process.env.SMTP_HOST || "sandbox.smtp.mailtrap.io",
     port,
     secure: port === 465,
     auth: { user, pass },
   });
 
-  const destino = process.env.DESTINO_EMAIL || user;
+  const destino = process.env.DESTINO_EMAIL || from;
   const dataBR = new Date().toLocaleString("pt-BR", {
     timeZone: "America/Sao_Paulo",
   });
 
   try {
     await transporter.sendMail({
-      from: `"Inscrições · IA para Planejadores" <${user}>`,
+      from: `"IA para Planejadores" <${from}>`,
       to: destino,
       replyTo: email,
-      subject: `Nova inscrição na turma fundadora: ${nome}`,
+      subject: `${querMentoria ? "Mentoria + imersão" : "Imersão"}: novo interesse de ${nome}`,
       text: [
-        "Nova inscrição na turma fundadora",
+        "Novo interesse na IA para Planejadores",
         "",
         `Nome: ${nome}`,
         `E-mail: ${email}`,
         `WhatsApp: ${whatsapp}`,
+        `Interesse: ${querMentoria ? "Imersão + Mentoria de Implementação (R$ 4.497)" : "Imersão (R$ 1.497)"}`,
         `Quando: ${dataBR} (horário de Brasília)`,
         "",
         "Combinado da landing: retorno em até 1 dia útil.",

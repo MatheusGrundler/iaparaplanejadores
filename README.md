@@ -2,7 +2,7 @@
 
 App Next.js (App Router + TypeScript) que reúne TUDO num único deploy da Vercel:
 
-- **Landing de vendas pública** na raiz `/` (anônimo vê `public/landing.html` via rewrite do middleware; o formulário de inscrição envia por `/api/inscricao` com SMTP Titan — env `SMTP_USER`/`SMTP_PASS`).
+- **Landing de vendas pública** na raiz `/` (anônimo vê `public/landing.html` via rewrite do middleware; o formulário registra o interesse, incluindo a opção de mentoria, e envia por SMTP/Mailtrap).
 - **Área do aluno** na mesma raiz `/` depois do login, com trilha, Biblioteca de materiais e Comunidade rica com anexos.
 - **Administração** em `/admin` (formulários, liberação das Etapas, alunos, materiais e entregas).
 
@@ -58,8 +58,7 @@ O esquema esperado está versionado em `supabase/migrations/`. Para um projeto n
    - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
    - `SUPABASE_SECRET_KEY` — somente no servidor
    - `NEXT_PUBLIC_SITE_URL` — domínio final em HTTPS, sem caminho
-   - `SMTP_USER` e `SMTP_PASS` — necessários para o formulário público
-   - `SMTP_HOST`, `SMTP_PORT` e `DESTINO_EMAIL` — opcionais; consulte `.env.example`
+   - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` e `DESTINO_EMAIL` — necessários para o formulário público; consulte `.env.example` para o Mailtrap Sandbox
 4. No Supabase, configure o domínio final como Site URL e permita exatamente `https://SEU-DOMINIO/auth/confirm` nas Redirect URLs.
 5. Rode os Security e Performance Advisors do Supabase, teste um aluno ativo, um expirado, um e-mail ausente e um admin antes de liberar produção.
 
