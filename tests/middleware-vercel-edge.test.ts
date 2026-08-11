@@ -57,6 +57,14 @@ test("middleware da Vercel depende somente da configuração pública do Supabas
   assert.doesNotMatch(fonte, /SUPABASE_(?:SECRET|SERVICE_ROLE)_KEY/);
 });
 
+test("middleware permanece no runtime Edge empacotado pelo Next", () => {
+  const fonte = readFileSync(resolve(process.cwd(), "middleware.ts"), "utf8");
+
+  assert.match(fonte, /^import \{ createServerClient,/m);
+  assert.doesNotMatch(fonte, /runtime:\s*["']nodejs["']/);
+  assert.doesNotMatch(fonte, /\brequire\s*\(/);
+});
+
 test("middleware usa chave publicável, aceita fallback público e falha sem configuração", async () => {
   const middleware = await middlewarePromise;
   limparChamadasSupabase();
