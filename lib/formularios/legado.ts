@@ -39,6 +39,7 @@ type ConfiguracaoQuestAtual = {
   atividadeKey: string;
   respostasIniciais?: ValoresFormulario;
   statusInicial?: string | null;
+  atualizadoEmInicial?: string | null;
   anexosIniciais?: readonly AnexoFormulario[];
   respostaIdInicial?: string;
   fetcher?: Fetcher;
@@ -56,13 +57,14 @@ export function criarAdaptadorQuestAtual(
       status: statusQuest(configuracao.statusInicial),
       valores: configuracao.respostasIniciais ?? {},
       anexos: configuracao.anexosIniciais ?? [],
+      atualizadoEm: configuracao.atualizadoEmInicial ?? undefined,
     },
     historico: [],
   } satisfies EstadoFormulario;
 
-  async function salvar(estado: EstadoFormulario, enviar: boolean) {
+  async function enviarQuest(estado: EstadoFormulario) {
     const resposta = await fetcher(endpoint, {
-      method: enviar ? "POST" : "PUT",
+      method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ respostas: estado.atual.valores }),
     });
@@ -77,7 +79,7 @@ export function criarAdaptadorQuestAtual(
         ...estado.atual,
         id: typeof atividade.id === "string" ? atividade.id : estado.atual.id,
         status: statusQuest(
-          typeof atividade.status === "string" ? atividade.status : enviar ? "enviada" : "rascunho",
+          typeof atividade.status === "string" ? atividade.status : "enviada",
         ),
         atualizadoEm:
           typeof atividade.atualizado_em === "string"
@@ -98,11 +100,8 @@ export function criarAdaptadorQuestAtual(
         },
       });
     },
-    async salvarRascunho({ estado }) {
-      return salvar(estado, false);
-    },
     async enviar({ estado }) {
-      return salvar(estado, true);
+      return enviarQuest(estado);
     },
     async adicionarAnexo({ estado, campo, arquivo }) {
       const preparo = await jsonDaResposta(

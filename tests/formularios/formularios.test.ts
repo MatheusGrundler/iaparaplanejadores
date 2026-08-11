@@ -20,8 +20,9 @@ import {
 } from "../../lib/formularios/validacao";
 
 test("registro publica os seeds de Quest e Dúvida por código", () => {
-  assert.equal(FORMULARIOS_INICIAIS.length, 11);
-  assert.equal(REGISTRO_FORMULARIOS.listar().length, 11);
+  assert.equal(FORMULARIOS_INICIAIS.length, 10);
+  assert.equal(REGISTRO_FORMULARIOS.listar().length, 10);
+  assert.equal(REGISTRO_FORMULARIOS.buscar("quest-preparacao-skill"), null);
   assert.equal(REGISTRO_FORMULARIOS.obter("quest-etapa-1").workflow.tipo, "quest");
   assert.equal(REGISTRO_FORMULARIOS.obter("duvida-etapa-1").workflow.tipo, "duvida");
   assert.equal(
@@ -103,7 +104,7 @@ test("registro escolhe a maior versão publicada", () => {
   assert.equal(registro.buscar(base.codigo, { versao: 2 }), null);
 });
 
-test("adapter em memória salva, envia e bloqueia Quest revisada", async () => {
+test("adapter em memória envia diretamente e bloqueia Quest revisada", async () => {
   const definicao: DefinicaoFormulario = {
     ...novoFormulario("quest"),
     codigo: "quest-teste",
@@ -119,9 +120,7 @@ test("adapter em memória salva, envia e bloqueia Quest revisada", async () => {
     ...inicial,
     atual: { ...inicial.atual, valores: { "campo-1": "Uma resposta" } },
   };
-  const salvo = await adapter.salvarRascunho?.({ definicao, estado: editado });
-  assert.equal(salvo?.atual.status, "rascunho");
-  const enviado = await adapter.enviar({ definicao, estado: salvo! });
+  const enviado = await adapter.enviar({ definicao, estado: editado });
   assert.equal(enviado.atual.status, "enviado");
   const revisado = await adapter.revisar?.({
     definicao,
@@ -129,7 +128,7 @@ test("adapter em memória salva, envia e bloqueia Quest revisada", async () => {
   });
   assert.equal(revisado?.atual.status, "revisado");
   await assert.rejects(
-    () => adapter.salvarRascunho!({ definicao, estado: revisado! }),
+    () => adapter.enviar({ definicao, estado: revisado! }),
     /já foi revisada/,
   );
 });
@@ -159,7 +158,7 @@ test("adapter em memória mantém dúvidas repetíveis e permite resposta", asyn
     definicao,
     registroId: primeiro.historico[0].id,
     texto: "Use o preview e depois faça o deploy.",
-    autor: "Resposta do Matheus",
+    autor: "Resposta da equipe",
   });
   assert.equal(respondido?.historico[0].status, "respondido");
   assert.equal(respondido?.historico[0].resposta?.texto, "Use o preview e depois faça o deploy.");

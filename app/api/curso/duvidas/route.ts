@@ -104,6 +104,6 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  await logEvento(identity.email, "duvida_etapa");
+  await logEvento(identity.email, "duvida_etapa", undefined, semanaKey);
   return respostaJson({ ok: true, duvida: data }, 201);
 }

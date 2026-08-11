@@ -61,7 +61,7 @@ export async function carregarEstadoSemana(
     ["anexos", anexosResult.error],
     ["dúvidas", duvidasResult.error],
   ] as const) {
-    if (error) console.error(`Falha ao carregar ${contexto} do curso:`, error.code);
+    if (error) console.error(`Falha ao carregar ${contexto} da Imersão:`, error.code);
   }
 
   const admin = privilegedDatabase();
@@ -111,7 +111,7 @@ export async function carregarStatusCurso(userId: string) {
     .eq("user_id", userId);
   const { data, error } = await query;
   if (error) {
-    console.error("Falha ao carregar progresso do curso:", error.code);
+    console.error("Falha ao carregar progresso da Imersão:", error.code);
     return new Map<string, { status: string; atualizadoEm: string | null }>();
   }
   return new Map(

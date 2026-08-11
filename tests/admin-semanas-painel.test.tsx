@@ -42,8 +42,11 @@ test("painel renderiza estado efetivo da turma e as três escolhas individuais",
       { email: "bia@exemplo.com", etapa_key: "semana-1", liberada: true },
       { email: "bia@exemplo.com", etapa_key: "semana-2", liberada: false },
     ],
+    versoesConteudo: [{ turma_id: 7, etapa_key: "semana-0", versao: "v1" }],
+    versoesDisponiveis: [{ codigo: "v1", rotulo: "Versão 1" }],
     definirLiberacaoSemana: semAcao,
     definirLiberacaoEtapaAluno: semAcao,
+    definirVersaoConteudoTurma: semAcao,
   });
   const arvore = elementos(painel);
   const selects = arvore.filter((elemento) => elemento.type === "select");
@@ -51,13 +54,14 @@ test("painel renderiza estado efetivo da turma e as três escolhas individuais",
   const opcoes = arvore.filter((elemento) => elemento.type === "option");
   const conteudo = texto(painel);
 
-  assert.equal(selects.length, 15);
-  assert.equal(formularios.length, 20);
-  assert.equal(opcoes.length, 45);
+  assert.equal(selects.length, 20);
+  assert.equal(formularios.length, 25);
+  assert.equal(opcoes.length, 50);
   const estados = selects.map((select) => (select.props as { defaultValue?: string }).defaultValue);
   assert.ok(estados.includes("liberada"));
   assert.ok(estados.includes("bloqueada"));
   assert.ok(estados.includes("turma"));
+  assert.ok(estados.includes("v1"));
   assert.match(conteudo, /Turma Agosto/);
   assert.match(conteudo, /1\/5 abertas/);
   assert.match(conteudo, /Anaana@exemplo\.com · Turma Agosto · 1 ajuste/);
@@ -67,6 +71,7 @@ test("painel renderiza estado efetivo da turma e as três escolhas individuais",
   assert.match(conteudo, /Bloqueada agora/);
   assert.match(conteudo, /Padrão da turma \(aberta\)/);
   assert.match(conteudo, /Padrão da turma \(bloqueada\)/);
+  assert.match(conteudo, /Versão 1/);
 });
 
 test("painel cobre os estados vazios sem esconder os controles de exceção", () => {

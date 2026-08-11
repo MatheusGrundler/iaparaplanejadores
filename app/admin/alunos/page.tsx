@@ -21,7 +21,7 @@ export default async function AlunosPage() {
 
   const db = adminClient();
 
-  const [{ data: alunos }, { data: turmas }, { data: logins }] =
+  const [{ data: alunos }, { data: turmas }, { data: logins }, { data: historicoTurmas }] =
     await Promise.all([
       db
         .from("whitelist")
@@ -33,11 +33,34 @@ export default async function AlunosPage() {
         .select("email, criado_em")
         .eq("tipo", "login")
         .order("criado_em", { ascending: false }),
+      db
+        .from("aluno_turmas")
+        .select("email, entrou_em, saiu_em, turmas(nome)")
+        .order("entrou_em", { ascending: true }),
     ]);
 
   const ultimoLogin = new Map<string, string>();
   for (const l of logins ?? []) {
     if (!ultimoLogin.has(l.email)) ultimoLogin.set(l.email, l.criado_em);
+  }
+
+  const historicoPorAluno = new Map<
+    string,
+    Array<{ entrou_em: string; saiu_em: string | null; turmas: { nome: string } | null }>
+  >();
+  for (const matricula of historicoTurmas ?? []) {
+    const relacaoTurma = matricula.turmas as unknown as
+      | { nome: string }
+      | { nome: string }[]
+      | null;
+    const turma = Array.isArray(relacaoTurma) ? relacaoTurma[0] ?? null : relacaoTurma;
+    const lista = historicoPorAluno.get(matricula.email) ?? [];
+    lista.push({
+      entrou_em: matricula.entrou_em,
+      saiu_em: matricula.saiu_em,
+      turmas: turma,
+    });
+    historicoPorAluno.set(matricula.email, lista);
   }
 
   return (
@@ -100,6 +123,7 @@ export default async function AlunosPage() {
               <tr>
                 <th>Aluno</th>
                 <th>Turma</th>
+                <th>Histórico de turmas</th>
                 <th>Acesso até</th>
                 <th>Último login</th>
                 <th>Ações</th>
@@ -115,6 +139,7 @@ export default async function AlunosPage() {
                 const limite = expiracaoEfetiva(a.expira_em, turma?.acesso_ate);
                 const expirado = limite && limite.getTime() <= Date.now();
                 const login = ultimoLogin.get(a.email);
+                const historico = historicoPorAluno.get(a.email) ?? [];
                 return (
                   <tr key={a.email}>
                     <td>
@@ -139,6 +164,23 @@ export default async function AlunosPage() {
                         </select>
                         <button className="btn btn-fantasma btn-mini">ok</button>
                       </form>
+                    </td>
+                    <td>
+                      {historico.length === 0 ? (
+                        <span className="muted">Começa a registrar agora</span>
+                      ) : (
+                        <details>
+                          <summary>{historico.map((item) => item.turmas?.nome ?? "Turma").join(" → ")}</summary>
+                          <ul className="muted" style={{ margin: "8px 0 0", paddingLeft: 18 }}>
+                            {historico.map((item) => (
+                              <li key={`${item.turmas?.nome}-${item.entrou_em}`}>
+                                {item.turmas?.nome ?? "Turma"} · {dataBr(item.entrou_em)}
+                                {item.saiu_em ? ` até ${dataBr(item.saiu_em)}` : " · atual"}
+                              </li>
+                            ))}
+                          </ul>
+                        </details>
+                      )}
                     </td>
                     <td>
                       {expirado ? (

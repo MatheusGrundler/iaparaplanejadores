@@ -6,13 +6,14 @@ function ocorrencias(texto: string, trecho: string) {
   return texto.split(trecho).length - 1;
 }
 
-test("dashboard usa o registro em código e as liberações simples da turma", async () => {
+test("dashboard usa conteúdo em código, versão da turma e liberações simples", async () => {
   const [dashboard, layout] = await Promise.all([
     fonte("app/(aluno)/page.tsx"),
     fonte("app/(aluno)/layout.tsx"),
   ]);
 
-  assert.match(dashboard, /CONTEUDOS_NATIVOS/);
+  assert.match(dashboard, /conteudoNativoPorVersao/);
+  assert.match(dashboard, /carregarVersoesConteudo/);
   assert.match(dashboard, /carregarLiberacoesSemanas/);
   assert.doesNotMatch(dashboard, /carregarTrilhaDoMembro|turma_etapas/);
   assert.doesNotMatch(dashboard, /href=["']\/arquivo["']/);
@@ -38,6 +39,9 @@ test("endereço direto e todas as mutações conferem a liberação pelo formul�
   assert.ok(ocorrencias(anexos, "await resolverQuestDoUsuario(") >= 3);
   assert.ok(ocorrencias(duvidas, "await resolverFormularioDoUsuario(") >= 2);
   assert.match(servidor, /podeAcessarSemana\(identity, formulario\.semanaKey\)/);
+  assert.match(servidor, /FORMULARIOS_DESATIVADOS\.has\(identificador\)/);
+  assert.match(servidor, /quest-preparacao-skill/);
+  assert.match(servidor, /comLinguagemInstitucional\(resultado\.definicao\)/);
   assert.doesNotMatch(atividade, /turma_etapa_id|conteudo_versao_id/);
   assert.doesNotMatch(anexos, /turma_etapa_id|conteudo_versao_id/);
   assert.doesNotMatch(duvidas, /turma_etapa_id|conteudo_versao_id/);

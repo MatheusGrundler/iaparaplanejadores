@@ -139,7 +139,9 @@ async function salvar(req: NextRequest, params: Ctx["params"], enviar: boolean) 
     );
   }
 
-  if (enviar) await logEvento(identity.email, "quest_enviada");
+  if (enviar) {
+    await logEvento(identity.email, "quest_enviada", undefined, atividade.semanaKey);
+  }
   return respostaJson({ ok: true, atividade: data });
 }
 

@@ -18,7 +18,6 @@ const CODIGOS_QUEST: ReadonlyArray<{
   codigo: string;
 }> = [
   { atividadeKey: "semana-0-preparacao", codigo: "quest-preparacao-agente" },
-  { atividadeKey: "semana-0-skill-relatorio", codigo: "quest-preparacao-skill" },
   { atividadeKey: "semana-1-quest", codigo: "quest-etapa-1" },
   { atividadeKey: "semana-2-quest", codigo: "quest-etapa-2" },
   { atividadeKey: "semana-3-quest", codigo: "quest-etapa-3" },
@@ -100,9 +99,9 @@ function duvidaEtapa(codigo: string, semanaKey: SemanaKey): DefinicaoFormulario 
     publicacao: "publicado",
     titulo: "O que ficou travado?",
     descricao:
-      "Escreva do seu jeito. A pergunta chega ao Matheus e pode virar pauta da próxima live.",
+      "Escreva do seu jeito. A pergunta chega aqui para acompanharmos e pode virar pauta da próxima live de dúvidas.",
     rotuloEnvio: "Enviar dúvida",
-    workflow: workflowDuvida("Resposta do Matheus"),
+    workflow: workflowDuvida("Resposta da equipe"),
     campos: [
       {
         chave: "pergunta",

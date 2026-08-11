@@ -15,6 +15,62 @@ export type ColunaComparacao = {
   items: readonly string[];
 };
 
+export type ServicoBancada = {
+  nome: string;
+  sigla: string;
+  papel: string;
+  momento: string;
+  resumo: string;
+  cobranca: string;
+  nota?: string;
+  acao?:
+    | {
+        status: "pendente";
+        label: string;
+      }
+    | {
+        status: "disponivel";
+        label: string;
+        url: string;
+      };
+};
+
+export type GrupoServicos = {
+  tipo: "custo-mensal" | "custo-por-uso" | "instalado-na-vps" | "conta-gratuita";
+  title: string;
+  description: string;
+  contexto?: {
+    sigla: string;
+    nome: string;
+    rotulo: string;
+    descricao: string;
+    conclusao: string;
+  };
+  items: readonly ServicoBancada[];
+};
+
+export type AvisoCustosBancada = {
+  eyebrow: string;
+  title: string;
+  text: string;
+  etapas: ReadonlyArray<{
+    quando: string;
+    tipo: string;
+    servicos: string;
+  }>;
+  note: string;
+};
+
+export type ConceitoSistema = {
+  id: "agente" | "modelo" | "ambiente" | "skill" | "mcp";
+  nome: string;
+  termo: string;
+  analogia: string;
+  resumo: string;
+  exemplo: string;
+  nota?: string;
+};
+
 export type BlocoSemana =
   | {
       type: "paragraph";
@@ -40,6 +96,23 @@ export type BlocoSemana =
       type: "comparison";
       title?: string;
       columns: readonly ColunaComparacao[];
+    }
+  | {
+      type: "services";
+      costNotice: AvisoCustosBancada;
+      groups: readonly GrupoServicos[];
+    }
+  | {
+      type: "concept-map";
+      title: string;
+      image: {
+        src: string;
+        alt: string;
+        width: number;
+        height: number;
+      };
+      items: readonly ConceitoSistema[];
+      connection: readonly string[];
     }
   | {
       type: "prompt";
@@ -93,28 +166,22 @@ const SEMANAS_BASE = [
     promise:
       "Você chega ao primeiro encontro com os acessos organizados, um nome e um e-mail para o seu futuro agente e um mapa simples do que cada peça faz.",
     objectives: [
-      "Entender a dinâmica da imersão e o ciclo entre uma etapa de conteúdo e a live.",
+      "Entender a dinâmica da imersão e o ciclo entre uma etapa de conteúdo e a live de dúvidas.",
       "Organizar as contas essenciais sem assinar ferramentas antes da hora.",
-      "Distinguir aplicativo, modelo, agente, ambiente de trabalho, skill e MCP.",
-      "Desenhar a primeira skill com um exemplo realista do escritório, usando somente dados fictícios.",
+      "Entender, sem tecnicês, o que são agente, modelo de IA, ambiente de trabalho, skill e MCP.",
+      "Organizar a identidade e os acessos do futuro agente sem expor senhas, tokens ou dados de clientes.",
     ],
     result:
-      "Ao terminar, você sabe onde acompanhar o curso, o que precisa estar pronto, como as principais peças se conectam e qual será o primeiro trabalho repetível do seu agente.",
+      "Ao terminar, você sabe onde acompanhar a Imersão, quais acessos precisam estar prontos e como as principais peças do sistema se conectam.",
     sections: [
       {
         id: "boas-vindas",
         title: "Que bom ter você aqui",
-        lede: "Obrigado por confiar na imersão. Você não entrou em um curso para colecionar ferramentas. Entrou para construir um sistema útil para o seu escritório, com calma, teste e responsabilidade.",
+        lede: "Obrigado por confiar na imersão. Você não entrou em uma Imersão para colecionar ferramentas. Entrou para construir um sistema útil para o seu escritório, com calma, teste e responsabilidade.",
         blocks: [
           {
             type: "paragraph",
-            text: "A proposta é simples: você recebe uma etapa de conteúdo dentro da plataforma, pratica no seu ritmo e participa de uma live para executar, comparar resultados e destravar dúvidas. Depois da live, a próxima etapa é liberada.",
-          },
-          {
-            type: "callout",
-            tone: "info",
-            title: "A trilha não segue o calendário",
-            text: "Preparação, Etapa 1, Etapa 2, Etapa 3 e Etapa 4 marcam o seu avanço, não datas. Entre uma etapa e outra existe uma live. A próxima etapa aparece quando o encontro anterior termina e o administrador faz a liberação.",
+            text: "A proposta é simples: você lê, pratica e trabalha com o conteúdo da etapa no seu ritmo. Depois, participa de uma live exclusivamente para tirar dúvidas, mostrar o que fez e receber orientação antes da liberação da próxima etapa.",
           },
           {
             type: "steps",
@@ -126,15 +193,15 @@ const SEMANAS_BASE = [
               },
               {
                 title: "Faça a quest",
-                text: "Cada etapa termina com uma entrega pequena que prova o que funcionou. Ela fica salva na sua conta e chega ao Matheus.",
+                text: "Cada etapa termina com uma entrega pequena que prova o que funcionou. Ela fica salva na sua conta e chega aqui para validarmos.",
               },
               {
                 title: "Envie suas dúvidas",
-                text: "Use o formulário da própria etapa. Dúvidas parecidas viram pauta da live e casos individuais continuam identificados por aluno.",
+                text: "Use o formulário da própria etapa. Dúvidas parecidas viram pauta da live de dúvidas e casos individuais continuam identificados por aluno.",
               },
               {
-                title: "Participe da live",
-                text: "A live é laboratório, não repetição da página. Você chega com tentativa feita, erro registrado e perguntas concretas.",
+                title: "Participe da live de dúvidas",
+                text: "A live não traz conteúdo novo. Você chega com a tentativa feita para tirar dúvidas, mostrar o que funcionou ou travou e receber orientação para continuar.",
               },
             ],
           },
@@ -153,32 +220,175 @@ const SEMANAS_BASE = [
       },
       {
         id: "contas-e-acessos",
-        title: "As contas que formam a sua bancada",
-        lede: "Nem tudo precisa ser pago agora. Primeiro, entenda o papel de cada conta. A plataforma vai avisar quando uma opção deixa de ser futura e passa a ser necessária.",
+        title: "O que você contrata e o que roda na sua VPS",
+        lede: "Nem toda peça é uma assinatura. Veja o que gera custo fora da Imersão, o que será instalado na VPS e quais contas de apoio você vai usar. Espere a orientação da plataforma antes de contratar.",
         blocks: [
           {
-            type: "comparison",
-            title: "O que entra agora e o que entra depois",
-            columns: [
+            type: "services",
+            costNotice: {
+              eyebrow: "Mensalidade extra",
+              title: "Assinaturas necessárias: R$ 352 a R$ 800 por mês",
+              text: "Esse valor é pago direto aos fornecedores, além da Imersão. Contrate cada serviço apenas no momento indicado abaixo.",
+              etapas: [
+                {
+                  quando: "No início",
+                  tipo: "Mensalidades",
+                  servicos: "Codex: R$ 120–550/mês + VPS: R$ 53–71/mês",
+                },
+                {
+                  quando: "Na etapa de canais",
+                  tipo: "Mensalidades",
+                  servicos: "Salvy: R$ 30/mês + Z-API: R$ 99/mês",
+                },
+                {
+                  quando: "Quando a etapa orientar",
+                  tipo: "Créditos mensais",
+                  servicos: "OpenRouter: R$ 50/mês em créditos",
+                },
+              ],
+              note: "SMTP não entra nesta estimativa. Ele só será necessário se você ativar automações de e-mail e o valor depende do provedor escolhido.",
+            },
+            groups: [
               {
-                title: "Prepare agora",
-                description: "É a base para começar a construção.",
+                tipo: "custo-mensal",
+                title: "Mensalidades extras",
+                description: "Você paga essas ferramentas por mês, além da Imersão. Codex e VPS entram no início; Salvy e Z-API, só quando usar WhatsApp.",
                 items: [
-                  "Codex ou o acesso OpenAI indicado para trabalhar nos arquivos e configurações.",
-                  "Uma VPS individual para hospedar o OpenClaw.",
-                  "Uma conta GitHub para guardar versões do que for construído.",
-                  "Um Gmail novo, exclusivo do agente.",
-                  "Telegram instalado e uma conta que será dona do bot.",
+                  {
+                    nome: "Codex + acesso OpenAI",
+                    sigla: "AI",
+                    papel: "Ambiente de trabalho com IA",
+                    momento: "Contrate no início",
+                    resumo: "É onde você cria, revisa e organiza os arquivos e as configurações do agente durante a Imersão.",
+                    cobranca: "R$ 120–550/mês",
+                    nota: "Recomendação: comece pelo plano de R$ 120/mês. Acompanhe o gasto e suba para R$ 550/mês apenas se precisar.",
+                    acao: {
+                      status: "pendente",
+                      label: "Você receberá o convite por e-mail",
+                    },
+                  },
+                  {
+                    nome: "VPS",
+                    sigla: "VPS",
+                    papel: "Computador na nuvem",
+                    momento: "Contrate no início",
+                    resumo: "É o computador online que vai manter OpenClaw e n8n disponíveis sem depender do seu notebook.",
+                    cobranca: "R$ 53–71/mês",
+                    acao: {
+                      status: "disponivel",
+                      label: "Contratar VPS com 20% no 1º mês",
+                      url: "https://www.hostinger.com/br/cart?product=vps%3Avps_kvm_2&period=1&referral_type=cart_link&REFERRALCODE=OYRMATHEUVYF&referral_id=019f768d-8bd7-7371-a2f3-50d277eb0c07",
+                    },
+                  },
+                  {
+                    nome: "Número dedicado / Salvy",
+                    sigla: "+55",
+                    papel: "Número separado para o agente",
+                    momento: "Somente na etapa de canais",
+                    resumo: "Separa a identidade do agente do seu WhatsApp pessoal. A Salvy é uma opção para obter o número ou eSIM.",
+                    cobranca: "R$ 30/mês",
+                    acao: {
+                      status: "disponivel",
+                      label: "Ver planos da Salvy",
+                      url: "https://salvy.com.br/planos",
+                    },
+                  },
+                  {
+                    nome: "Z-API",
+                    sigla: "ZA",
+                    papel: "Conexão com o WhatsApp",
+                    momento: "Somente na etapa do WhatsApp",
+                    resumo: "Faz a conexão técnica entre o número dedicado e o agente nas automações previstas.",
+                    cobranca: "R$ 99/mês",
+                    nota: "É uma rota não oficial. A etapa explica os riscos antes da contratação.",
+                    acao: {
+                      status: "disponivel",
+                      label: "Ver planos da Z-API",
+                      url: "https://z-api.io/?utm_source=google&utm_medium=cpc&utm_campaign=rededepesquisa2025#planos",
+                    },
+                  },
                 ],
               },
               {
-                title: "Ative quando a aula pedir",
-                description: "São úteis, mas não devem virar custo antecipado sem propósito.",
+                tipo: "custo-por-uso",
+                title: "Créditos para modelos de IA",
+                description: "Reserve R$ 50 por mês em créditos quando a etapa pedir outros modelos de IA.",
                 items: [
-                  "OpenRouter para ampliar a escolha de modelos e rotas.",
-                  "Salvy ou outro número dedicado para separar a identidade do agente.",
-                  "Z-API somente quando entrar o laboratório de WhatsApp, conhecendo os riscos de uma rota não oficial.",
-                  "Créditos extras de modelos apenas depois de estimar o teste e o custo.",
+                  {
+                    nome: "OpenRouter",
+                    sigla: "OR",
+                    papel: "Créditos para modelos de IA",
+                    momento: "Ative quando a etapa orientar",
+                    resumo: "Reúne diferentes modelos de IA em um só acesso. Os créditos diminuem conforme o uso.",
+                    cobranca: "R$ 50/mês em créditos",
+                    acao: {
+                      status: "disponivel",
+                      label: "Abrir OpenRouter",
+                      url: "https://openrouter.ai/",
+                    },
+                  },
+                ],
+              },
+              {
+                tipo: "instalado-na-vps",
+                title: "Programas instalados na sua VPS",
+                description: "OpenClaw e n8n ficam dentro do computador na nuvem que você já contratou. Na configuração ensinada aqui, eles não representam duas novas assinaturas.",
+                contexto: {
+                  sigla: "VPS",
+                  nome: "Sua VPS",
+                  rotulo: "Você contrata e paga mensalmente",
+                  descricao: "O computador na nuvem que hospeda os programas do seu agente.",
+                  conclusao: "Você paga pela VPS; OpenClaw e n8n são instalados nela e não geram uma assinatura separada na configuração usada na Imersão.",
+                },
+                items: [
+                  {
+                    nome: "OpenClaw",
+                    sigla: "OC",
+                    papel: "Agente sempre ligado",
+                    momento: "Instale depois de contratar a VPS",
+                    resumo: "Recebe mensagens, reúne as instruções e chama a IA e as ferramentas certas para executar o trabalho.",
+                    cobranca: "Sem assinatura separada",
+                  },
+                  {
+                    nome: "n8n",
+                    sigla: "n8n",
+                    papel: "Automação visual",
+                    momento: "Instale na etapa de automações",
+                    resumo: "Conecta sistemas e organiza fluxos com gatilhos, etapas, decisões e um histórico do que aconteceu.",
+                    cobranca: "Sem assinatura separada",
+                  },
+                ],
+              },
+              {
+                tipo: "conta-gratuita",
+                title: "Contas gratuitas para a Imersão",
+                description: "São contas de apoio usadas para organizar o agente e separá-lo da sua vida pessoal. Os acessos gratuitos atendem ao caminho proposto na Imersão.",
+                items: [
+                  {
+                    nome: "GitHub",
+                    sigla: "GH",
+                    papel: "Arquivos, histórico e recuperação",
+                    momento: "Crie na Preparação",
+                    resumo: "Guarda os arquivos do projeto, registra cada versão e permite recuperar uma alteração anterior.",
+                    cobranca: "Conta gratuita",
+                  },
+                  {
+                    nome: "Gmail do agente",
+                    sigla: "GM",
+                    papel: "Identidade digital separada",
+                    momento: "Crie na Preparação",
+                    resumo: "Cadastra os serviços e recebe comunicações operacionais sem misturar tudo com sua conta pessoal.",
+                    cobranca: "Conta gratuita",
+                    nota: "Guarde o acesso no gerenciador de senhas e ative a proteção oferecida.",
+                  },
+                  {
+                    nome: "Telegram",
+                    sigla: "TG",
+                    papel: "Primeiro canal de conversa",
+                    momento: "Prepare no início",
+                    resumo: "Conecta você ao agente por meio de um bot em um canal simples e separado.",
+                    cobranca: "Conta gratuita",
+                  },
                 ],
               },
             ],
@@ -211,207 +421,104 @@ const SEMANAS_BASE = [
             title: "Segredo não é conteúdo de aula",
             text: "Nunca cole senha, token, chave de API, código de recuperação ou arquivo .env em quest, formulário de dúvida, print ou conversa no grupo. Se um segredo aparecer por engano, revogue e gere outro antes de continuar.",
           },
-          {
-            type: "links",
-            title: "Fontes oficiais para abrir conta e conferir instruções",
-            items: [
-              {
-                label: "Codex: primeiros passos",
-                url: "https://learn.chatgpt.com/docs/quickstart",
-                description:
-                  "Documentação oficial OpenAI para conferir as formas atuais de acesso ao Codex.",
-              },
-              {
-                label: "OpenClaw: instalação",
-                url: "https://docs.openclaw.ai/install",
-                description: "Fonte oficial para o procedimento de instalação vigente.",
-              },
-              {
-                label: "GitHub: o que é um repositório",
-                url: "https://docs.github.com/en/repositories/creating-and-managing-repositories/about-repositories",
-              },
-              {
-                label: "OpenRouter: início rápido",
-                url: "https://openrouter.ai/docs/quickstart",
-              },
-              {
-                label: "Salvy",
-                url: "https://salvy.com.br/",
-                description: "Referência da turma para número ou eSIM dedicado.",
-              },
-              {
-                label: "Z-API: documentação",
-                url: "https://developer.z-api.io/en/webhooks/introduction",
-                description:
-                  "Use somente na etapa de WhatsApp e depois de entender a diferença entre rota oficial e sessão baseada no WhatsApp Web.",
-              },
-            ],
-          },
         ],
       },
       {
         id: "mapa-do-sistema",
-        title: "Quem pensa, quem conversa e quem trabalha",
-        lede: "Os nomes se misturam porque todos usam IA, mas cada peça ocupa um lugar diferente. Separar esses papéis evita comprar ferramenta errada e culpar o modelo por um problema de configuração.",
+        title: "Cinco conceitos para entender o agente",
+        lede: "Comece pelos nomes simples. Os termos técnicos aparecem apenas para você reconhecê-los quando encontrar.",
         blocks: [
           {
-            type: "comparison",
-            title: "As peças principais",
-            columns: [
-              {
-                title: "Aplicativo de conversa",
-                description: "É a interface onde você conversa, anexa algo e recebe uma resposta.",
-                items: [
-                  "ChatGPT é um exemplo de aplicativo de conversa e trabalho.",
-                  "Uma conversa isolada não conhece automaticamente o seu escritório.",
-                  "Ela é ótima para pensar, revisar e explorar uma tarefa pontual.",
-                ],
-              },
-              {
-                title: "Ambiente de trabalho do agente",
-                description:
-                  "Também chamado de harness, reúne modelo, arquivos, instruções, ferramentas, permissões e confirmação humana.",
-                items: [
-                  "Codex e Claude Code são exemplos dessa categoria.",
-                  "Eles conseguem trabalhar sobre uma pasta ou projeto dentro dos limites concedidos.",
-                  "O modelo é o motor; o ambiente é o carro inteiro, com volante, freio e painel.",
-                ],
-              },
-              {
-                title: "Runtime do agente",
-                description:
-                  "É o sistema que mantém o agente disponível e o conecta a canais, ferramentas e tarefas agendadas.",
-                items: [
-                  "OpenClaw ocupa esse papel na imersão.",
-                  "Ele roda na VPS e conecta o agente ao Telegram e, mais tarde, a outras integrações.",
-                  "O runtime não transforma uma instrução ruim em processo seguro.",
-                ],
-              },
-            ],
-          },
-          {
-            type: "paragraph",
-            text: "LLM é a família de modelos que interpreta e produz linguagem. Há famílias conhecidas como GPT, Claude, Grok e Llama. Versões, preços, limites e disponibilidade mudam. Por isso, durante a imersão você aprende a descobrir o que está disponível e a testar o modelo no seu caso, em vez de decorar um nome.",
-          },
-          {
-            type: "callout",
-            tone: "info",
-            title: "Modelo não é agente",
-            text: "O modelo gera a resposta. O agente combina modelo, contexto, instruções, ferramentas, limites e um objetivo. Trocar de modelo pode melhorar uma saída, mas não substitui processo claro, fonte confiável e revisão humana.",
-          },
-        ],
-      },
-      {
-        id: "skills",
-        title: "Skill é o jeito aprovado de fazer algo",
-        lede: "Uma skill guarda um procedimento que já foi entendido e testado. Ela ensina quando agir, quais entradas aceitar, o que produzir, quando parar e o que nunca fazer.",
-        blocks: [
-          {
-            type: "bullets",
-            title: "Uma boa skill deixa explícito",
-            items: [
-              "Qual problema resolve e quando deve ser usada.",
-              "Quais informações entram e quais dados são proibidos.",
-              "Qual sequência precisa ser seguida.",
-              "Como conferir se a saída ficou boa.",
-              "Em quais situações o agente deve parar e pedir ajuda.",
-              "Quais ações continuam dependendo da sua aprovação.",
-            ],
-          },
-          {
-            type: "steps",
-            title: "Do trabalho repetido à primeira skill",
+            type: "concept-map",
+            title: "Explore uma peça de cada vez",
+            image: {
+              src: "/ilustracoes/fluxo-agente.png",
+              alt: "Ilustração de uma conversa conectada à inteligência artificial, aos arquivos de trabalho e ao agente online",
+              width: 1823,
+              height: 863,
+            },
             items: [
               {
-                title: "Escolha uma repetição estável",
-                text: "Comece pelo relatório financeiro mensal do próprio escritório. Não comece pelo processo mais sensível nem por uma rotina que muda toda vez.",
+                id: "agente",
+                nome: "Assistente que executa",
+                termo: "Agente de IA",
+                analogia: "Um colaborador digital.",
+                resumo:
+                  "Recebe um objetivo, segue regras, usa ferramentas e entrega uma tarefa para você revisar.",
+                exemplo:
+                  "Prepara o resumo da reunião e deixa o e-mail pronto para aprovação.",
+                nota: "Ele não decide sozinho o que será enviado.",
               },
               {
-                title: "Descreva entrada e saída",
-                text: "Defina quais dados fictícios entram, qual estrutura o relatório deve ter e quais verificações vêm antes da entrega.",
+                id: "modelo",
+                nome: "IA que lê e escreve",
+                termo: "LLM / modelo de IA",
+                analogia: "O redator por trás da resposta.",
+                resumo:
+                  "Lê o pedido e gera textos, ideias ou análises a partir das informações recebidas.",
+                exemplo:
+                  "Transforma anotações de uma reunião em um resumo organizado para o cliente.",
+                nota: "GPT e Claude são exemplos de modelos de IA.",
               },
               {
-                title: "Rode um caso normal e um caso ruim",
-                text: "Teste um mês completo e depois um mês com campo ausente ou valor incoerente. A skill precisa avisar, não inventar.",
+                id: "ambiente",
+                nome: "Ambiente de trabalho",
+                termo: "Harness",
+                analogia: "A mesa equipada do colaborador.",
+                resumo:
+                  "Reúne a IA, os arquivos, as instruções, as permissões e as ferramentas no mesmo lugar.",
+                exemplo:
+                  "No Codex, o agente abre arquivos do escritório e atualiza uma apresentação.",
+                nota: "Codex e Claude Code são exemplos.",
               },
               {
-                title: "Aprove antes de salvar",
-                text: "Leia a skill, corrija a linguagem e só então permita que o agente a grave no workspace.",
+                id: "skill",
+                nome: "Procedimento pronto",
+                termo: "Skill",
+                analogia: "Um manual de trabalho reutilizável.",
+                resumo:
+                  "Guarda o passo a passo para repetir uma tarefa sempre do jeito combinado.",
+                exemplo:
+                  "Produz o relatório mensal com a mesma estrutura e as mesmas verificações.",
+                nota: "Nesta Preparação, você só entende o papel; a criação vem depois.",
+              },
+              {
+                id: "mcp",
+                nome: "Ponte com outros sistemas",
+                termo: "MCP",
+                analogia: "Uma tomada que conecta ferramentas.",
+                resumo: "Permite consultar ou usar sistemas externos com acesso controlado.",
+                exemplo:
+                  "Consulta a agenda autorizada e registra uma tarefa sem copiar tudo manualmente.",
+                nota: "Conectar não significa confiar: cada acesso precisa de autorização.",
               },
             ],
-          },
-          {
-            type: "prompt",
-            title: "Peça assim ao seu ambiente de trabalho",
-            text: `Quero transformar o preparo do relatório financeiro mensal do meu escritório em uma skill.
-
-Antes de criar qualquer arquivo, faça uma pergunta por vez para entender:
-1. quais dados entram;
-2. quais cálculos ou conferências são obrigatórios;
-3. qual estrutura o relatório precisa seguir;
-4. o que deve bloquear a execução;
-5. o que eu preciso revisar antes de considerar o relatório pronto.
-
-Depois, proponha o texto da skill e um teste com dados totalmente fictícios. Inclua um caso normal e um caso com informação faltando. Não envie nada, não use dados de cliente e só grave a skill depois da minha aprovação explícita.`,
-            note: "O objetivo agora é entender o formato. A skill será instalada e testada quando o agente estiver funcionando.",
-          },
-          {
-            type: "links",
-            title: "Para consultar",
-            items: [
-              {
-                label: "Skills no OpenClaw",
-                url: "https://docs.openclaw.ai/tools/skills",
-              },
-              {
-                label: "Como criar skills no Codex",
-                url: "https://learn.chatgpt.com/docs/build-skills",
-              },
-            ],
-          },
-        ],
-      },
-      {
-        id: "mcp",
-        title: "MCP é uma ponte padronizada",
-        lede: "MCP significa Model Context Protocol. Ele cria uma forma comum de um aplicativo de IA acessar ferramentas e fontes externas, como agenda, arquivos ou sistemas autorizados.",
-        blocks: [
-          {
-            type: "paragraph",
-            text: "Pense em uma porta USB-C: o formato da conexão é conhecido, mas cada aparelho ainda tem sua função e sua permissão. Um servidor MCP pode oferecer ferramentas e dados. O aplicativo ou agente cliente decide se consegue conectar e o usuário decide o que será autorizado.",
-          },
-          {
-            type: "callout",
-            tone: "warning",
-            title: "Conectar não significa confiar",
-            text: "MCP não é atalho de segurança. Antes de conectar, confira quem mantém o servidor, quais dados ele lê, quais ações ele executa, onde as credenciais ficam e como revogar o acesso. Comece com leitura e dados fictícios sempre que possível.",
-          },
-          {
-            type: "links",
-            title: "Fonte oficial",
-            items: [
-              {
-                label: "Introdução ao Model Context Protocol",
-                url: "https://modelcontextprotocol.io/docs/getting-started/intro",
-              },
+            connection: [
+              "Você pede",
+              "O agente coordena",
+              "O modelo escreve",
+              "O ambiente organiza",
+              "A skill orienta",
+              "O MCP conecta",
+              "Você revisa",
             ],
           },
         ],
       },
       {
         id: "resumo-e-duvidas",
-        title: "Seu mapa antes da primeira live",
+        title: "Seu mapa antes da primeira live de dúvidas",
         blocks: [
           {
             type: "summary",
             title: "Seis ideias para guardar",
             items: [
               "A plataforma organiza conteúdo, quests, gravações e dúvidas.",
-              "As quatro etapas de conteúdo são intercaladas pelas lives da imersão.",
+              "As quatro etapas de conteúdo são intercaladas pelas lives de dúvidas da imersão.",
               "O modelo é o motor; o agente é o sistema com contexto, ferramentas e limites.",
               "Codex e Claude Code são ambientes de trabalho; OpenClaw mantém o agente rodando e conectado.",
-              "Skill é um procedimento aprovado e testável.",
-              "MCP conecta sistemas, mas cada conexão continua exigindo permissão e revisão.",
+              "A preparação separa identidade e acessos sem expor credenciais ou dados reais.",
+              "A skill guarda um passo a passo; o MCP conecta sistemas com permissão e revisão.",
             ],
           },
           {
@@ -575,7 +682,7 @@ Depois da entrevista, proponha quais arquivos do workspace devem receber cada in
               },
               {
                 title: "Proteja o mapa",
-                text: "A relação entre identificador e pessoa fica local, privada e fora do repositório. Ela nunca entra na plataforma do curso.",
+                text: "A relação entre identificador e pessoa fica local, privada e fora do repositório. Ela nunca entra na plataforma da Imersão.",
               },
             ],
           },
@@ -768,7 +875,7 @@ Ao final, registre o modelo usado, a rota, a data e o custo informado na execuç
           {
             type: "callout",
             tone: "info",
-            title: "Leve a tentativa para a live",
+            title: "Leve a tentativa para a live de dúvidas",
             text: "No formulário de dúvidas, informe se o problema está no contexto, na proteção, na busca, no backup ou na construção visual. Anexe somente provas já revisadas e sem informação sensível.",
           },
         ],
@@ -849,7 +956,7 @@ Ao final, registre o modelo usado, a rota, a data e o custo informado na execuç
                 description: "Responde à pergunta quando.",
                 items: [
                   "Agenda uma execução única ou recorrente.",
-                  "Mantém histórico e estado da tarefa no runtime.",
+                  "Guarda o histórico e acompanha o andamento da tarefa no OpenClaw.",
                   "Pode acordar um agente ou chamar um destino configurado.",
                 ],
               },
@@ -1044,7 +1151,7 @@ Crie primeiro uma execução manual com dados fictícios. Não envie mensagem a 
           {
             type: "callout",
             tone: "info",
-            title: "Leve o histórico para a live",
+            title: "Leve o histórico para a live de dúvidas",
             text: "No formulário de dúvidas, informe o identificador da execução sem expor segredo, o horário esperado, o resultado observado e como a rotina se comportou na falha simulada.",
           },
         ],
@@ -1684,8 +1791,8 @@ Não conecte WhatsApp real, não envie mensagens, não use dados de cliente e n�
           {
             type: "callout",
             tone: "info",
-            title: "A live começa pela execução",
-            text: "Envie no formulário de dúvidas o ponto exato onde o item entrou, o caminho percorrido, o estado final e o teste que falhou. Um print do canvas sem execução não mostra se o fluxo funciona.",
+            title: "Mostre a execução na live de dúvidas",
+            text: "Faça e teste no seu ritmo. Envie no formulário o ponto exato onde o item entrou, o caminho percorrido, o estado final e o teste que falhou. Na live, mostre o resultado, tire dúvidas e receba orientação para continuar.",
           },
         ],
       },

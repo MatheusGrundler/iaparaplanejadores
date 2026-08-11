@@ -45,6 +45,7 @@ export type CampoAnexoFormulario = {
 export type WorkflowQuest = {
   tipo: "quest";
   multiplicidade: "unico";
+  /** Campo legado mantido para definições publicadas na versão 1 do schema. */
   rascunho: {
     autosave: true;
     esperaMs: number;
@@ -149,7 +150,7 @@ export function workflowQuest(esperaMs = 900): WorkflowQuest {
   };
 }
 
-export function workflowDuvida(rotuloAutor = "Resposta do Matheus"): WorkflowDuvida {
+export function workflowDuvida(rotuloAutor = "Resposta da equipe"): WorkflowDuvida {
   return {
     tipo: "duvida",
     multiplicidade: "multiplo",

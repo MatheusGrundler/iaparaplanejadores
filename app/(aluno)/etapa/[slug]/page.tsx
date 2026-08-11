@@ -1,16 +1,24 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import Formulario from "@/app/componentes/curso/Formulario";
-import { conteudoNativoPorKey } from "@/app/componentes/curso/conteudos";
+import RastreadorEtapa from "@/app/componentes/curso/RastreadorEtapa";
+import {
+  conteudoNativoPorVersao,
+  versaoConteudoValida,
+} from "@/app/componentes/curso/conteudos";
 import { getMemberIdentity } from "@/lib/auth";
 import { SEMANA_KEYS, type SemanaKey } from "@/lib/curso-atividades";
+import { carregarVersoesConteudo } from "@/lib/curso-conteudo-versao";
 import { carregarLiberacoesSemanas } from "@/lib/curso-liberacao";
 import { semanaEstaLiberada } from "@/lib/curso-liberacao-regra";
 import { chaveEtapaDoSlug, slugPublicoEtapa } from "@/lib/curso-nomenclatura";
 
 export const dynamic = "force-dynamic";
 
-type Props = { params: Promise<{ slug: string }> };
+type Props = {
+  params: Promise<{ slug: string }>;
+  searchParams?: Promise<{ versao?: string | string[] }>;
+};
 
 const FORMULARIO_DUVIDA: Readonly<Record<SemanaKey, string>> = {
   "semana-0": "duvida-preparacao",
@@ -20,7 +28,7 @@ const FORMULARIO_DUVIDA: Readonly<Record<SemanaKey, string>> = {
   "semana-4": "duvida-etapa-4",
 };
 
-export default async function EtapaPage({ params }: Props) {
+export default async function EtapaPage({ params, searchParams }: Props) {
   const { slug } = await params;
   const chave = chaveEtapaDoSlug(slug);
   if (!chave) notFound();
@@ -30,12 +38,23 @@ export default async function EtapaPage({ params }: Props) {
 
   const identity = await getMemberIdentity();
   if (!identity) return null;
-  const liberacoes = await carregarLiberacoesSemanas(identity);
+  const [liberacoes, versoesConteudo, parametros] = await Promise.all([
+    carregarLiberacoesSemanas(identity),
+    carregarVersoesConteudo(identity),
+    searchParams ?? Promise.resolve<{ versao?: string | string[] }>({}),
+  ]);
   if (!semanaEstaLiberada(liberacoes, chave)) {
     redirect(`/?etapa-bloqueada=${slugCanonico}`);
   }
 
-  const conteudo = conteudoNativoPorKey(chave);
+  const versaoSolicitada =
+    typeof parametros.versao === "string" && versaoConteudoValida(parametros.versao)
+      ? parametros.versao
+      : null;
+  const versao = identity.admin && versaoSolicitada
+    ? versaoSolicitada
+    : versoesConteudo.get(chave)!;
+  const conteudo = conteudoNativoPorVersao(versao, chave);
   const Componente = conteudo.componente;
   const indice = SEMANA_KEYS.indexOf(chave);
   const anteriorKey = SEMANA_KEYS.slice(0, indice)
@@ -45,6 +64,7 @@ export default async function EtapaPage({ params }: Props) {
 
   return (
     <main className="conteudo-nativo-route">
+      <RastreadorEtapa semanaKey={chave} />
       <Componente
         renderAtividade={(atividade) => <Formulario codigo={atividade.key} />}
         duvidas={<Formulario codigo={FORMULARIO_DUVIDA[chave]} />}

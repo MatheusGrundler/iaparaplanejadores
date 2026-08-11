@@ -49,7 +49,6 @@ export interface FormularioRuntimeAdapter {
     definicao: DefinicaoFormulario;
     contexto?: ContextoRuntimeFormulario;
   }): Promise<EstadoFormulario>;
-  salvarRascunho?(args: OperacaoFormulario): Promise<EstadoFormulario>;
   enviar(args: OperacaoFormulario): Promise<EstadoFormulario>;
   adicionarAnexo?(args: OperacaoAnexoFormulario): Promise<EstadoFormulario>;
   removerAnexo?(args: OperacaoRemocaoAnexo): Promise<EstadoFormulario>;

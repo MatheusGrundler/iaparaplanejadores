@@ -20,7 +20,7 @@ export default async function AdminLayout({ children }: Readonly<{ children: Rea
           <Link href="/admin/semanas">Etapas</Link>
           <Link href="/admin/formularios">Formulários</Link>
           <Link href="/admin/materiais">Materiais</Link>
-          <Link href="/admin/leituras">Leituras</Link>
+          <Link href="/admin/leituras">Leituras e atividade</Link>
           <Link href="/admin/entregas">Entregas</Link>
           <Link href="/">← área do aluno</Link>
         </nav>

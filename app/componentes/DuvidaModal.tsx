@@ -8,7 +8,7 @@ import { LIMITES_ANEXOS, tipoDoMime, validaNovoAnexo } from "@/lib/duvida";
 /**
  * Modal do aluno: dúvida com texto formatado + anexos (10 imagens de até
  * 10 MB, 5 vídeos de até 100 MB). Upload vai direto pro Storage com URL
- * assinada. Mostra a resposta do Matheus quando existir.
+ * assinada. Mostra a resposta da equipe quando existir.
  */
 
 type Anexo = {
@@ -163,16 +163,16 @@ export default function DuvidaModal({ downloadId, aberto, aoFechar, aoRegistrar 
         <>
           {resposta && (
             <div className="duvida-resposta">
-              <div className="muted" style={{ fontSize: ".8rem", marginBottom: 6 }}>
-                Resposta do Matheus
+              <div className="muted" style={{ fontSize: ".875rem", marginBottom: 6 }}>
+                Resposta da equipe
               </div>
               <div className="duvida-html" dangerouslySetInnerHTML={{ __html: resposta }} />
             </div>
           )}
 
           <p className="muted" style={{ margin: "0 0 8px" }}>
-            Escreve do seu jeito. Vai direto pro Matheus e pode virar tema da próxima live de
-            dúvidas.
+            Escreve do seu jeito. Chega aqui para acompanharmos e pode virar tema da próxima live
+            de dúvidas.
           </p>
           <EditorRico
             inicial={html}
@@ -199,7 +199,7 @@ export default function DuvidaModal({ downloadId, aberto, aoFechar, aoRegistrar 
               >
                 {subindo ? `Enviando ${subindo}…` : "Anexar imagem ou vídeo"}
               </button>
-              <span className="muted" style={{ fontSize: ".8rem" }}>
+              <span className="muted" style={{ fontSize: ".875rem" }}>
                 {imagens}/{LIMITES_ANEXOS.imagens} imagens (10 MB cada) · {videos}/
                 {LIMITES_ANEXOS.videos} vídeos (100 MB cada)
               </span>

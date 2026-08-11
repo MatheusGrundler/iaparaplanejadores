@@ -33,6 +33,7 @@ export default async function Formulario({ codigo }: Props) {
     <FormularioCurso
       definicao={formulario.definicao}
       semanaKey={formulario.semanaKey}
+      chaveSessao={`${identity.userId}:${formulario.semanaKey}`}
       atividade={atividade ? estado.atividades[atividade.key] : undefined}
       duvidas={estado.duvidas}
       somenteLeitura={identity.admin}

@@ -14,6 +14,7 @@ import {
 type Props = {
   definicao: DefinicaoFormulario;
   semanaKey: SemanaKey;
+  chaveSessao: string;
   atividade?: EstadoAtividade;
   duvidas?: readonly DuvidaAtual[];
   somenteLeitura?: boolean;
@@ -23,6 +24,7 @@ type Props = {
 export default function FormularioCurso({
   definicao,
   semanaKey,
+  chaveSessao,
   atividade,
   duvidas = [],
   somenteLeitura = false,
@@ -35,6 +37,7 @@ export default function FormularioCurso({
             respostaIdInicial: atividade?.id ?? undefined,
             respostasIniciais: atividade?.respostas,
             statusInicial: atividade?.status,
+            atualizadoEmInicial: atividade?.atualizadoEm,
             anexosIniciais: atividade?.anexos,
           })
         : criarAdaptadorDuvidaAtual({
@@ -49,7 +52,7 @@ export default function FormularioCurso({
       codigo={definicao.codigo}
       definicao={definicao}
       adapter={adapter}
-      contexto={{ semanaKey }}
+      contexto={{ semanaKey, chaveSessao }}
       somenteLeitura={somenteLeitura}
       mostrarHistorico={definicao.workflow.tipo === "duvida"}
     />

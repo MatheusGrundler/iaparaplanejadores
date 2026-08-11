@@ -34,3 +34,12 @@ test("GSAP e ScrollTrigger têm versão fixa e integridade verificável", () => 
     /const\s+MOTION_READY\s*=\s*Boolean\(\s*window\.gsap\s*&&\s*window\.ScrollTrigger\s*\);/,
   );
 });
+
+test("landing apresenta as lives somente como encontros de tira-dúvidas", () => {
+  assert.match(landing, /Não há conteúdo novo na live/);
+  assert.match(landing, /tirar dúvidas, mostrar as tentativas e\s+receber orientação/);
+  assert.doesNotMatch(
+    landing,
+    /construir junto, ao vivo|Encontros ao vivo, construindo|Ao vivo, com as próprias mãos|live para dúvidas e implementação/i,
+  );
+});

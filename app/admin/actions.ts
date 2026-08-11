@@ -5,6 +5,7 @@ import { getUserEmail, isAdmin, logEvento } from "@/lib/auth";
 import { normalizeEmail } from "@/lib/access";
 import { aplicarLiberacaoIndividual } from "@/lib/admin-liberacao-etapa";
 import { SEMANA_KEYS } from "@/lib/curso-atividades";
+import { versaoConteudoValida } from "@/app/componentes/curso/conteudos";
 import { removerMaterialComSeguranca, validarArquivoParaLeitura } from "@/lib/materiais-admin";
 import { privilegedDatabase } from "@/lib/supabase/admin";
 
@@ -250,6 +251,29 @@ export async function definirLiberacaoEtapaAluno(formData: FormData) {
   revalidatePath("/admin/semanas");
   revalidatePath("/");
   revalidatePath(`/semana/${etapaKey}`);
+  revalidatePath("/etapa/[slug]", "page");
+}
+
+/** Escolhe qual edição em código cada turma abre em uma etapa. */
+export async function definirVersaoConteudoTurma(formData: FormData) {
+  await requireAdmin();
+  const turmaId = positiveInteger(formData.get("turma_id"));
+  const semanaKey = String(formData.get("semana_key") ?? "");
+  const versao = String(formData.get("versao") ?? "");
+  if (!turmaId || !(SEMANA_KEYS as readonly string[]).includes(semanaKey)) {
+    throw new Error("Turma ou etapa inválida.");
+  }
+  if (!versaoConteudoValida(versao)) {
+    throw new Error("Essa versão de conteúdo não existe no código.");
+  }
+
+  const { error } = await privilegedDatabase().from("turma_conteudo_versoes").upsert(
+    { turma_id: turmaId, etapa_key: semanaKey, versao },
+    { onConflict: "turma_id,etapa_key" },
+  );
+  assertOk(error, "Atualização da versão de conteúdo");
+  revalidatePath("/admin/semanas");
+  revalidatePath("/");
   revalidatePath("/etapa/[slug]", "page");
 }
 
