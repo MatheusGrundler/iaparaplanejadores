@@ -1,6 +1,5 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { supabasePublicKey, supabaseUrl } from "@/lib/supabase/env";
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 
@@ -14,13 +13,21 @@ export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
   let authHeaders = { ...PRIVATE_CACHE_HEADERS };
 
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const supabasePublicKey =
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+  if (!supabaseUrl || !supabasePublicKey) {
+    throw new Error("Configuração pública do Supabase ausente no middleware.");
+  }
+
   const applyAuthState = (target: NextResponse) => {
     response.cookies.getAll().forEach((cookie) => target.cookies.set(cookie));
     Object.entries(authHeaders).forEach(([name, value]) => target.headers.set(name, value));
     return target;
   };
 
-  const supabase = createServerClient(supabaseUrl(), supabasePublicKey(), {
+  const supabase = createServerClient(supabaseUrl, supabasePublicKey, {
     cookies: {
       getAll() {
         return request.cookies.getAll();
