@@ -103,5 +103,9 @@ export function useRouter() {
   };
 }
 
+export function redirect(path: string): never {
+  throw new Error(`REDIRECT:${path}`);
+}
+
 export type MemberIdentity = IdentidadeMock;
 export type PrivilegedDatabase = never;

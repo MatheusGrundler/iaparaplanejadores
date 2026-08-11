@@ -1,11 +1,11 @@
 import Link from "next/link";
-import { CONTEUDOS_NATIVOS } from "@/app/componentes/curso/conteudos";
+import { conteudoNativoPorVersao } from "@/app/componentes/curso/conteudos";
 import { getMemberIdentity } from "@/lib/auth";
 import { SEMANA_KEYS, type SemanaKey } from "@/lib/curso-atividades";
+import { carregarVersoesConteudo } from "@/lib/curso-conteudo-versao";
 import { carregarStatusCurso } from "@/lib/curso-estado";
 import { carregarLiberacoesSemanas } from "@/lib/curso-liberacao";
 import { chaveEtapaDoSlug, slugPublicoEtapa } from "@/lib/curso-nomenclatura";
-import { FORMULARIOS_INICIAIS } from "@/lib/formularios";
 
 export const dynamic = "force-dynamic";
 
@@ -29,20 +29,16 @@ function statusDaSemana(
   };
 }
 
-function formulariosQuestDaEtapa(semanaKey: SemanaKey) {
-  return FORMULARIOS_INICIAIS.filter(
-    (formulario) =>
-      formulario.workflow.tipo === "quest" && formulario.metadados?.semanaKey === semanaKey,
-  ).map((formulario) => ({ key: formulario.codigo }));
-}
-
 export default async function ImersaoPage({ searchParams }: Props) {
   const identity = await getMemberIdentity();
   if (!identity) return null;
 
-  const liberacoes = await carregarLiberacoesSemanas(identity);
+  const [liberacoes, versoesConteudo] = await Promise.all([
+    carregarLiberacoesSemanas(identity),
+    carregarVersoesConteudo(identity),
+  ]);
   const itens = SEMANA_KEYS.map((semanaKey, ordem) => {
-    const conteudo = CONTEUDOS_NATIVOS[semanaKey];
+    const conteudo = conteudoNativoPorVersao(versoesConteudo.get(semanaKey)!, semanaKey);
     return {
       id: semanaKey,
       ordem,
@@ -56,7 +52,7 @@ export default async function ImersaoPage({ searchParams }: Props) {
           title: conteudo.metadata.titulo,
           promise: conteudo.metadata.promessa,
         },
-        atividades: formulariosQuestDaEtapa(semanaKey),
+        atividades: conteudo.atividades.map((atividade) => ({ key: atividade.key })),
       },
     };
   });

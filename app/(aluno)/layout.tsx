@@ -57,7 +57,10 @@ export default async function AlunoLayout({ children }: Readonly<{ children: Rea
         </div>
         <nav className="nav">
           <Link href="/">Minha trilha</Link>
-          <Link href="/comunidade">Comunidade</Link>
+          <span className="nav-indisponivel" aria-label="Feed — em breve">
+            Feed
+            <span>Em breve</span>
+          </span>
           <Link href="/arquivo">Biblioteca de materiais</Link>
           {admin && <Link href="/admin">Admin</Link>}
           <form action="/auth/signout" method="post" style={{ display: "inline" }}>

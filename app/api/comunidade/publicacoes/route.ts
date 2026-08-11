@@ -25,7 +25,9 @@ export async function POST(req: NextRequest) {
     return respostaJson({ ok: false, erro: "Não consegui preparar a publicação." }, 500);
   }
 
-  const autor = identity.admin ? "Matheus" : aluno?.nome || identity.email.split("@")[0];
+  const autor = identity.admin
+    ? "Equipe IA para Planejadores"
+    : aluno?.nome || identity.email.split("@")[0];
   const { data, error } = await db
     .from("posts")
     .insert({

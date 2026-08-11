@@ -112,7 +112,7 @@ export default function DuvidaAdmin({ downloadId, alunoEmail, alunoNome, respond
             )}
 
             <div style={{ marginTop: 18 }}>
-              <div className="muted" style={{ fontSize: ".8rem", marginBottom: 6 }}>
+              <div className="muted" style={{ fontSize: ".875rem", marginBottom: 6 }}>
                 {respostaAtual ? "Sua resposta (editar reenvia)" : "Sua resposta"}
               </div>
               <EditorRico

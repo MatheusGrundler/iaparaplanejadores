@@ -17,13 +17,18 @@ import {
   type ContextoRuntimeFormulario,
   type FormularioRuntimeAdapter,
 } from "@/lib/formularios/runtime";
+import {
+  aplicarRascunhoLocalAoEstado,
+  lerRascunhoLocal,
+  removerRascunhoLocal,
+  salvarRascunhoLocal,
+} from "@/lib/formularios/rascunho-local";
 import { validarArquivoFormulario, validarEnvioFormulario } from "@/lib/formularios/validacao";
 import { useFormularioRuntime } from "./FormularioRuntimeProvider";
 import styles from "./Formulario.module.css";
 import a11yStyles from "./Acessibilidade.module.css";
 
-type FaseFormulario =
-  "carregando" | "quieto" | "pendente" | "salvando" | "salvo" | "enviando" | "erro";
+type FaseFormulario = "carregando" | "quieto" | "salvo" | "enviando" | "erro";
 
 export type FormularioProps = {
   codigo: string;
@@ -58,6 +63,15 @@ function dataBr(iso: string) {
   });
 }
 
+function armazenamentoDaSessao() {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
+
 function rotuloStatus(
   definicao: DefinicaoFormulario,
   estado: EstadoFormulario,
@@ -66,15 +80,12 @@ function rotuloStatus(
 ) {
   if (somenteLeitura) return "Somente leitura";
   if (fase === "carregando") return "Carregando…";
-  if (fase === "pendente") return "Alterações pendentes";
-  if (fase === "salvando") return "Salvando…";
   if (fase === "enviando") return "Enviando…";
-  if (fase === "erro") return "Falha ao salvar";
+  if (fase === "erro") return "Não foi possível concluir";
   if (estado.atual.status === "revisado") return "Quest revisada";
   if (estado.atual.status === "enviado") return "Quest enviada";
   if (fase === "salvo" && definicao.workflow.tipo === "duvida") return "Dúvida enviada";
-  if (fase === "salvo" || estado.atual.status === "rascunho") return "Rascunho salvo";
-  return definicao.workflow.tipo === "quest" ? "Salvamento automático" : "Pronto para enviar";
+  return "Pronto para enviar";
 }
 
 function classeStatus(estado: EstadoFormulario, fase: FaseFormulario) {
@@ -82,7 +93,7 @@ function classeStatus(estado: EstadoFormulario, fase: FaseFormulario) {
   if (fase === "salvo" || ["enviado", "revisado"].includes(estado.atual.status)) {
     return styles.statusPositivo;
   }
-  if (["pendente", "salvando", "enviando"].includes(fase)) return styles.statusAtivo;
+  if (fase === "enviando") return styles.statusAtivo;
   return undefined;
 }
 
@@ -319,9 +330,9 @@ export function Formulario({
   const [errosGerais, setErrosGerais] = useState<string[]>([]);
   const [subindo, setSubindo] = useState<Record<string, string>>({});
   const [removendo, setRemovendo] = useState<string | null>(null);
-  const ultimoSalvo = useRef("");
-  const revisaoLocal = useRef(0);
-  const requisicao = useRef(0);
+  const [rascunhoPronto, setRascunhoPronto] = useState(false);
+  const rascunhoAlterado = useRef(false);
+  const baseRemota = useRef<EstadoFormulario | null>(null);
 
   function aplicarEstado(proximo: EstadoFormulario) {
     setEstado(proximo);
@@ -329,6 +340,9 @@ export function Formulario({
   }
 
   useEffect(() => {
+    setRascunhoPronto(false);
+    rascunhoAlterado.current = false;
+    baseRemota.current = null;
     if (!definicao) {
       setEstado(null);
       setFase("erro");
@@ -336,10 +350,29 @@ export function Formulario({
     }
     let ativo = true;
     const inicial = estadoInicial ?? estadoVazio(definicao);
+
+    const restaurarRascunho = (base: EstadoFormulario) => {
+      const armazenamento = armazenamentoDaSessao();
+      if (!armazenamento || somenteLeitura) return base;
+      if (formularioBloqueado(definicao, base)) {
+        removerRascunhoLocal(armazenamento, definicao, contextoFinal);
+        return base;
+      }
+      const rascunho = lerRascunhoLocal(armazenamento, definicao, contextoFinal);
+      if (!rascunho) return base;
+      const resultado = aplicarRascunhoLocalAoEstado(definicao, base, rascunho);
+      if (!resultado.aplicado) {
+        removerRascunhoLocal(armazenamento, definicao, contextoFinal);
+      }
+      return resultado.estado;
+    };
+
     if (estadoInicial || !adapter || somenteLeitura) {
-      setEstado(inicial);
-      ultimoSalvo.current = JSON.stringify(inicial.atual.valores);
+      baseRemota.current = inicial;
+      const restaurado = adapter ? restaurarRascunho(inicial) : inicial;
+      setEstado(restaurado);
       setFase("quieto");
+      setRascunhoPronto(Boolean(adapter) && !somenteLeitura);
       return;
     }
     setFase("carregando");
@@ -348,15 +381,19 @@ export function Formulario({
       .carregar({ definicao, contexto: contextoFinal })
       .then((carregado) => {
         if (!ativo) return;
-        setEstado(carregado);
-        ultimoSalvo.current = JSON.stringify(carregado.atual.valores);
+        baseRemota.current = carregado;
+        const restaurado = restaurarRascunho(carregado);
+        setEstado(restaurado);
         setFase("quieto");
-        onEstadoChange?.(carregado);
+        setRascunhoPronto(true);
+        onEstadoChange?.(restaurado);
       })
       .catch((erro) => {
         if (!ativo) return;
-        setEstado(inicial);
+        baseRemota.current = inicial;
+        setEstado(restaurarRascunho(inicial));
         setFase("erro");
+        setRascunhoPronto(true);
         setAviso(mensagemErroRuntime(erro, "Não consegui carregar este formulário."));
       });
     return () => {
@@ -374,66 +411,35 @@ export function Formulario({
 
   useEffect(() => {
     if (
+      !rascunhoPronto ||
       !definicao ||
       !estado ||
-      definicao.workflow.tipo !== "quest" ||
-      !adapter?.salvarRascunho ||
+      !adapter ||
       somenteLeitura ||
       bloqueado ||
-      ["carregando", "salvando", "enviando"].includes(fase) ||
-      valoresSerializados === ultimoSalvo.current
+      fase === "carregando" ||
+      fase === "enviando" ||
+      !rascunhoAlterado.current
     ) {
       return;
     }
-
-    setFase("pendente");
-    const revisaoAoAgendar = revisaoLocal.current;
-    const timer = window.setTimeout(async () => {
-      const minhaRequisicao = ++requisicao.current;
-      setFase("salvando");
-      setAviso(null);
-      try {
-        const salvo = await adapter.salvarRascunho?.({
-          definicao,
-          estado,
-          contexto: contextoFinal,
-        });
-        if (!salvo || minhaRequisicao !== requisicao.current) return;
-        if (revisaoAoAgendar === revisaoLocal.current) {
-          ultimoSalvo.current = JSON.stringify(salvo.atual.valores);
-          aplicarEstado(salvo);
-          setFase("salvo");
-        } else {
-          ultimoSalvo.current = valoresSerializados;
-          setEstado((atual) =>
-            atual
-              ? {
-                  ...atual,
-                  atual: {
-                    ...atual.atual,
-                    id: salvo.atual.id,
-                    status: salvo.atual.status,
-                    atualizadoEm: salvo.atual.atualizadoEm,
-                  },
-                }
-              : salvo,
-          );
-          setFase("pendente");
-        }
-      } catch (erro) {
-        if (minhaRequisicao !== requisicao.current) return;
-        setFase("erro");
-        setAviso(mensagemErroRuntime(erro, "Não consegui salvar o rascunho."));
-      }
-    }, definicao.workflow.rascunho.esperaMs);
-    return () => window.clearTimeout(timer);
-    // A mudança do próprio `estado` durante o save não deve reagendar a mesma revisão.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const armazenamento = armazenamentoDaSessao();
+    const base = baseRemota.current;
+    if (armazenamento && base) {
+      salvarRascunhoLocal(
+        armazenamento,
+        definicao,
+        estado.atual.valores,
+        base.atual,
+        contextoFinal,
+      );
+    }
   }, [
     adapter,
     bloqueado,
     definicao,
     fase,
+    rascunhoPronto,
     somenteLeitura,
     valoresSerializados,
     contextoSerializado,
@@ -453,8 +459,8 @@ export function Formulario({
   const baseId = `formulario-${definicao.codigo}-v${definicao.versao}`;
 
   function mudarCampo(chave: string, valor: string) {
-    revisaoLocal.current += 1;
-    if (definicaoAtiva.workflow.tipo === "duvida") setFase("quieto");
+    rascunhoAlterado.current = true;
+    setFase("quieto");
     setEstado((atual) =>
       atual
         ? {
@@ -493,7 +499,6 @@ export function Formulario({
   async function adicionarArquivos(campoChave: string, lista: FileList | null) {
     const campo = definicaoAtiva.anexos.find((item) => item.chave === campoChave);
     if (!campo || !lista?.length || !adapter?.adicionarAnexo || desabilitado || enviando) return;
-    revisaoLocal.current += 1;
     let estadoAtual: EstadoFormulario = estadoAtivo;
     for (const arquivo of Array.from(lista)) {
       const quantidade = estadoAtual.atual.anexos.filter(
@@ -538,7 +543,6 @@ export function Formulario({
 
   async function removerAnexo(anexo: AnexoFormulario) {
     if (!adapter?.removerAnexo || desabilitado || enviando) return;
-    revisaoLocal.current += 1;
     setRemovendo(anexo.id);
     setAviso(null);
     try {
@@ -568,6 +572,16 @@ export function Formulario({
     setErrosCampos(validacao.errosCampos);
     setErrosAnexos(validacao.errosAnexos);
     setErrosGerais(validacao.errosGerais);
+    const armazenamento = armazenamentoDaSessao();
+    if (armazenamento && rascunhoAlterado.current && baseRemota.current) {
+      salvarRascunhoLocal(
+        armazenamento,
+        definicaoAtiva,
+        estadoAtivo.atual.valores,
+        baseRemota.current.atual,
+        contextoFinal,
+      );
+    }
     if (!validacao.valido) {
       setAviso("Revise os campos indicados antes de enviar.");
       const primeiraChave =
@@ -589,13 +603,17 @@ export function Formulario({
         },
         contexto: contextoFinal,
       });
+      baseRemota.current = proximo;
       aplicarEstado(proximo);
-      ultimoSalvo.current = JSON.stringify(proximo.atual.valores);
+      rascunhoAlterado.current = false;
+      if (armazenamento) {
+        removerRascunhoLocal(armazenamento, definicaoAtiva, contextoFinal);
+      }
       setFase("salvo");
       setAviso(
         definicaoAtiva.workflow.tipo === "quest"
-          ? "Quest enviada. O Matheus já consegue acompanhar pelo painel."
-          : "Dúvida enviada. Ela já apareceu no painel do Matheus.",
+          ? "Quest enviada. Ela chegou aqui para validarmos."
+          : "Dúvida enviada. Ela já apareceu no painel para acompanharmos.",
       );
     } catch (erro) {
       setFase("erro");
@@ -605,7 +623,7 @@ export function Formulario({
 
   const textoStatus = rotuloStatus(definicao, estado, fase, somenteLeitura);
   const classeDoStatus = classeStatus(estado, fase);
-  const enviando = fase === "enviando" || fase === "salvando";
+  const enviando = fase === "enviando";
 
   return (
     <section
@@ -768,8 +786,8 @@ export function Formulario({
                 : bloqueado
                   ? "Esta entrega já foi revisada e não pode mais ser alterada."
                   : definicao.workflow.tipo === "quest"
-                    ? "Os campos com * entram na validação final. O rascunho é salvo sozinho."
-                    : "Você pode enviar mais de uma dúvida e acompanhar as respostas abaixo."}
+                    ? "O preenchimento fica guardado somente nesta aba até você concluir o envio."
+                    : "O texto fica guardado nesta aba até o envio. Depois, você acompanha a resposta abaixo."}
             </span>
           </div>
         </form>

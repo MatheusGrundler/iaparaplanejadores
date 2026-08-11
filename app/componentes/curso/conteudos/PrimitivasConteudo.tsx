@@ -3,26 +3,17 @@ import CopiarPrompt from "@/app/componentes/curso/CopiarPrompt";
 import type { Atividade } from "@/lib/curso-atividades";
 import type { BlocoSemana, QuestSemana, SecaoSemana, SemanaCurso } from "@/lib/curso-conteudo";
 import { blocoFonte } from "./dados";
+import MapaConceitosInterativo from "./MapaConceitos";
 import type { ConteudoNativoProps } from "./tipos";
 import styles from "./ConteudoNativo.module.css";
 
 type Bloco<Tipo extends BlocoSemana["type"]> = Extract<BlocoSemana, { type: Tipo }>;
-
-type PaginaProps = ConteudoNativoProps & {
-  etapa: SemanaCurso;
-  atividades: readonly Atividade[];
-  children: ReactNode;
-};
 
 const ICONE_AVISO = {
   info: "i",
   warning: "!",
   success: "✓",
 } as const;
-
-function rotuloDaEtapa(etapa: SemanaCurso) {
-  return etapa.number === 0 ? "Preparação" : `Etapa ${etapa.number}`;
-}
 
 function QuestDaEtapa({ quest }: { quest: QuestSemana }) {
   return (
@@ -64,11 +55,15 @@ function QuestDaEtapa({ quest }: { quest: QuestSemana }) {
   );
 }
 
-function AplicacoesDaEtapa({
+export function AplicacoesEtapa({
   etapa,
   atividades,
   renderAtividade,
-}: Pick<PaginaProps, "etapa" | "atividades" | "renderAtividade">) {
+}: {
+  etapa: SemanaCurso;
+  atividades: readonly Atividade[];
+  renderAtividade?: ConteudoNativoProps["renderAtividade"];
+}) {
   const tituloId = `${etapa.slug}-aplicacoes-titulo`;
 
   return (
@@ -100,67 +95,14 @@ function AplicacoesDaEtapa({
   );
 }
 
-export function PaginaConteudoNativo({
-  etapa,
-  atividades,
-  renderAtividade,
-  duvidas,
-  children,
-}: PaginaProps) {
-  const tituloId = `${etapa.slug}-titulo`;
-  const objetivosId = `${etapa.slug}-objetivos-titulo`;
-
-  return (
-    <article className={styles.pagina} aria-labelledby={tituloId}>
-      <header className={styles.hero}>
-        <div className={styles.heroTexto}>
-          <span className={styles.etapaRotulo}>{rotuloDaEtapa(etapa)}</span>
-          <h1 id={tituloId}>{etapa.title}</h1>
-          <p>{etapa.promise}</p>
-        </div>
-
-        <aside className={styles.resultado} aria-label="Resultado esperado">
-          <span>Você sai desta etapa com</span>
-          <p>{etapa.result}</p>
-        </aside>
-      </header>
-
-      <nav className={styles.indice} aria-label="Nesta página">
-        <span>Nesta página</span>
-        <ol>
-          {etapa.sections.map((secao) => (
-            <li key={secao.id}>
-              <a href={`#${etapa.slug}-${secao.id}`}>{secao.title}</a>
-            </li>
-          ))}
-          <li>
-            <a href={`#${etapa.slug}-aplicacoes`}>{etapa.quest ? "Quest" : "Aplicações"}</a>
-          </li>
-        </ol>
-      </nav>
-
-      <section className={styles.objetivos} aria-labelledby={objetivosId}>
-        <div>
-          <span className={styles.pill}>O que vamos fazer</span>
-          <h2 id={objetivosId}>Objetivos desta etapa</h2>
-        </div>
-        <ul>
-          {etapa.objectives.map((objetivo) => (
-            <li key={objetivo}>{objetivo}</li>
-          ))}
-        </ul>
-      </section>
-
-      <div className={styles.secoes}>{children}</div>
-
-      <AplicacoesDaEtapa etapa={etapa} atividades={atividades} renderAtividade={renderAtividade} />
-
-      {duvidas}
-    </article>
-  );
-}
-
-type VarianteSecao = "abertura" | "padrao" | "destaque" | "compacta" | "encerramento";
+type VarianteSecao =
+  | "abertura"
+  | "padrao"
+  | "destaque"
+  | "vitrine"
+  | "infografico"
+  | "compacta"
+  | "encerramento";
 
 export function SecaoConteudo({
   etapa,
@@ -294,6 +236,175 @@ export function Comparacao({ bloco }: { bloco: Bloco<"comparison"> }) {
       </div>
     </div>
   );
+}
+
+export function ServicosBancada({ bloco }: { bloco: Bloco<"services"> }) {
+  const rotulosGrupo = {
+    "custo-mensal": "Custo recorrente",
+    "custo-por-uso": "Custo variável",
+    "instalado-na-vps": "Dentro da VPS",
+    "conta-gratuita": "Sem mensalidade",
+  } as const;
+
+  function AcaoServico({
+    acao,
+  }: {
+    acao: Bloco<"services">["groups"][number]["items"][number]["acao"];
+  }) {
+    if (!acao) return null;
+    if (acao.status === "disponivel") {
+      return (
+        <a className={styles.servicoAcao} href={acao.url} target="_blank" rel="noreferrer">
+          <span>{acao.label}</span>
+          <span aria-hidden="true">↗</span>
+        </a>
+      );
+    }
+    return (
+      <span className={styles.servicoAcaoPendente} data-link-status="pendente">
+        <span aria-hidden="true">•</span>
+        <span>{acao.label}</span>
+      </span>
+    );
+  }
+
+  return (
+    <div className={styles.servicos}>
+      <aside className={styles.servicosCustos} aria-labelledby="custos-bancada-titulo">
+        <header className={styles.servicosCustosCabecalho}>
+          <span className={styles.servicosCustosIcone} aria-hidden="true">
+            $
+          </span>
+          <div>
+            <p>{bloco.costNotice.eyebrow}</p>
+            <h3 id="custos-bancada-titulo">{bloco.costNotice.title}</h3>
+            <p>{bloco.costNotice.text}</p>
+          </div>
+        </header>
+        <ol className={styles.servicosCustosEtapas}>
+          {bloco.costNotice.etapas.map((etapa, indice) => (
+            <li key={etapa.quando}>
+              <span aria-hidden="true">{indice + 1}</span>
+              <div>
+                <small>{etapa.quando}</small>
+                <strong>{etapa.tipo}</strong>
+                <p>{etapa.servicos}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
+        <p className={styles.servicosCustosNota}>{bloco.costNotice.note}</p>
+      </aside>
+
+      {bloco.groups.map((grupo, indiceGrupo) => {
+        const custos = grupo.tipo === "custo-mensal" || grupo.tipo === "custo-por-uso";
+        const naVps = grupo.tipo === "instalado-na-vps";
+        return (
+          <section
+            className={styles.servicoGrupo}
+            data-tipo={grupo.tipo}
+            key={grupo.title}
+          >
+            <header className={styles.servicoGrupoCabecalho}>
+              <div>
+                <span className={styles.servicoGrupoNumero} aria-hidden="true">
+                  {String(indiceGrupo + 1).padStart(2, "0")}
+                </span>
+                <div>
+                  <p className={styles.servicoGrupoTipo}>{rotulosGrupo[grupo.tipo]}</p>
+                  <h3>{grupo.title}</h3>
+                </div>
+              </div>
+              <p>{grupo.description}</p>
+            </header>
+
+            {custos && (
+              <div className={styles.servicosLista} role="list">
+                {grupo.items.map((servico) => (
+                  <article className={styles.servicoLinha} key={servico.nome} role="listitem">
+                    <span className={styles.servicoMarca} aria-hidden="true">
+                      {servico.sigla}
+                    </span>
+                    <div className={styles.servicoLinhaPrincipal}>
+                      <p className={styles.servicoPapel}>{servico.papel}</p>
+                      <h4>{servico.nome}</h4>
+                      <p>{servico.resumo}</p>
+                      {servico.nota && <small>{servico.nota}</small>}
+                    </div>
+                    <div className={styles.servicoLinhaCusto}>
+                      <strong>{servico.cobranca}</strong>
+                      <span>{servico.momento}</span>
+                    </div>
+                    <AcaoServico acao={servico.acao} />
+                  </article>
+                ))}
+              </div>
+            )}
+
+            {naVps && grupo.contexto && (
+              <figure className={styles.servicoVpsMapa}>
+                <div className={styles.servicoVpsExterior}>
+                  <span className={styles.servicoMarca} aria-hidden="true">
+                    {grupo.contexto.sigla}
+                  </span>
+                  <div>
+                    <small>{grupo.contexto.rotulo}</small>
+                    <strong>{grupo.contexto.nome}</strong>
+                    <p>{grupo.contexto.descricao}</p>
+                  </div>
+                  <span>Mensalidade extra</span>
+                </div>
+                <div className={styles.servicoVpsInterior}>
+                  <p>Instalados dentro da mesma VPS</p>
+                  <div>
+                    {grupo.items.map((servico) => (
+                      <article key={servico.nome}>
+                        <header>
+                          <span className={styles.servicoMarca} aria-hidden="true">
+                            {servico.sigla}
+                          </span>
+                          <span>{servico.cobranca}</span>
+                        </header>
+                        <p className={styles.servicoPapel}>{servico.papel}</p>
+                        <h4>{servico.nome}</h4>
+                        <p>{servico.resumo}</p>
+                        <small>{servico.momento}</small>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+                <figcaption>{grupo.contexto.conclusao}</figcaption>
+              </figure>
+            )}
+
+            {grupo.tipo === "conta-gratuita" && (
+              <div className={styles.servicosContas}>
+                {grupo.items.map((servico) => (
+                  <article key={servico.nome}>
+                    <header>
+                      <span className={styles.servicoMarca} aria-hidden="true">
+                        {servico.sigla}
+                      </span>
+                      <span>{servico.cobranca}</span>
+                    </header>
+                    <p className={styles.servicoPapel}>{servico.papel}</p>
+                    <h4>{servico.nome}</h4>
+                    <p>{servico.resumo}</p>
+                    <small>{servico.momento}</small>
+                    {servico.nota && <small>{servico.nota}</small>}
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
+export function MapaConceitos({ bloco }: { bloco: Bloco<"concept-map"> }) {
+  return <MapaConceitosInterativo bloco={bloco} />;
 }
 
 export function Prompt({ bloco }: { bloco: Bloco<"prompt"> }) {

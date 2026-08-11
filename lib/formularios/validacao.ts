@@ -137,7 +137,7 @@ export function validarDefinicaoFormulario(valor: unknown): ResultadoValidacaoDe
         problemas,
         "workflow.rascunho",
         "autosave_ausente",
-        "Quest precisa salvar rascunhos automaticamente.",
+        "Quest precisa manter a configuração de rascunho compatível com esta versão.",
       );
     } else {
       const espera = Number(valor.workflow.rascunho.esperaMs);
@@ -176,7 +176,7 @@ export function validarDefinicaoFormulario(valor: unknown): ResultadoValidacaoDe
         problemas,
         "workflow.rascunho",
         "rascunho_invalido",
-        "Dúvidas são enviadas diretamente, sem autosave.",
+        "Dúvidas precisam manter a configuração de envio direto desta versão.",
       );
     }
     if (!objeto(valor.workflow.resposta) || valor.workflow.resposta.habilitada !== true) {

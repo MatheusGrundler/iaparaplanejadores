@@ -15,7 +15,7 @@ export async function responderDuvidaSemana(formData: FormData) {
   const resposta = String(formData.get("resposta") ?? "").trim();
   if (!uuidValido(id) || resposta.length < 2 || resposta.length > 5000) return;
 
-  const { error } = await privilegedDatabase()
+  const { data, error } = await privilegedDatabase()
     .from("curso_duvidas")
     .update({
       resposta,
@@ -23,8 +23,15 @@ export async function responderDuvidaSemana(formData: FormData) {
       respondida_por: identity?.userId ?? null,
       respondida_em: new Date().toISOString(),
     })
-    .eq("id", id);
-  if (error) console.error("Falha ao responder dúvida do curso:", error.code);
+    .eq("id", id)
+    .eq("status", "aberta")
+    .is("resposta", null)
+    .select("id")
+    .maybeSingle();
+  if (error) console.error("Falha ao responder dúvida da Imersão:", error.code);
+  if (!error && !data) {
+    console.warn("A dúvida já havia sido respondida ou arquivada antes desta ação.");
+  }
   revalidatePath("/admin/entregas");
 }
 

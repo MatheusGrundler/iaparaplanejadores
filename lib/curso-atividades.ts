@@ -46,7 +46,7 @@ export const ATIVIDADES: Readonly<Record<string, Atividade>> = {
     semanaKey: "semana-0",
     titulo: "Preparação do seu agente",
     descricao:
-      "Registre o nome do agente e o estado das contas. Você pode salvar aos poucos e voltar quando quiser.",
+      "Registre o nome do agente e o estado das contas. O preenchimento fica nesta aba até você concluir o envio.",
     botao: "Concluir preparação",
     campos: [
       {
@@ -80,53 +80,6 @@ export const ATIVIDADES: Readonly<Record<string, Atividade>> = {
         max: 30,
         opcoes: ESTADO_SERVICO,
       })),
-    ],
-    anexos: [],
-  },
-  "semana-0-skill-relatorio": {
-    key: "semana-0-skill-relatorio",
-    semanaKey: "semana-0",
-    titulo: "Primeiro entregável: skill de relatório mensal",
-    descricao:
-      "Desenhe a skill antes de construir. Use somente dados fictícios nesta primeira versão.",
-    botao: "Entregar desenho da skill",
-    campos: [
-      {
-        key: "objetivo",
-        label: "O que a skill precisa entregar?",
-        tipo: "textarea",
-        placeholder: "Descreva o relatório e para quem ele serve.",
-        obrigatorio: true,
-        min: 40,
-        max: 2000,
-      },
-      {
-        key: "entradas",
-        label: "Quais informações fictícias ela recebe?",
-        tipo: "textarea",
-        placeholder: "Liste as entradas e os formatos esperados.",
-        obrigatorio: true,
-        min: 30,
-        max: 2000,
-      },
-      {
-        key: "saida",
-        label: "Como deve ser a saída?",
-        tipo: "textarea",
-        placeholder: "Estrutura, seções, tom e critérios de qualidade.",
-        obrigatorio: true,
-        min: 30,
-        max: 2000,
-      },
-      {
-        key: "revisao",
-        label: "O que precisa de revisão humana?",
-        tipo: "textarea",
-        placeholder: "Defina o que a IA nunca pode decidir sozinha.",
-        obrigatorio: true,
-        min: 30,
-        max: 2000,
-      },
     ],
     anexos: [],
   },

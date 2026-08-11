@@ -10,7 +10,7 @@ function respostaJson(corpo: Record<string, unknown>, status = 200) {
   });
 }
 
-test("adapter legado de Quest carrega, salva e envia no contrato atual", async () => {
+test("adapter legado de Quest carrega e envia sem PUT de autosave", async () => {
   const chamadas: Array<{ url: string; metodo: string; corpo?: Record<string, unknown> }> = [];
   const fetcher = (async (entrada: RequestInfo | URL, init?: RequestInit) => {
     const url = String(entrada);
@@ -31,6 +31,7 @@ test("adapter legado de Quest carrega, salva e envia no contrato atual", async (
     atividadeKey: "semana-1-quest",
     respostasIniciais: { como_ajuda: "Uma primeira versão" },
     statusInicial: "enviado",
+    atualizadoEmInicial: "2026-08-10T13:00:00.000Z",
     respostaIdInicial: "resposta-antiga",
     fetcher,
   });
@@ -38,15 +39,14 @@ test("adapter legado de Quest carrega, salva e envia no contrato atual", async (
   const inicial = await adapter.carregar({ definicao });
   assert.equal(inicial.atual.status, "enviado");
   assert.equal(inicial.atual.id, "resposta-antiga");
+  assert.equal(inicial.atual.atualizadoEm, "2026-08-10T13:00:00.000Z");
   assert.equal(inicial.atual.valores.como_ajuda, "Uma primeira versão");
 
-  const rascunho = await adapter.salvarRascunho!({ definicao, estado: inicial });
-  const enviado = await adapter.enviar({ definicao, estado: rascunho });
-  assert.equal(rascunho.atual.status, "rascunho");
+  const enviado = await adapter.enviar({ definicao, estado: inicial });
   assert.equal(enviado.atual.status, "enviado");
   assert.deepEqual(
     chamadas.map(({ metodo }) => metodo),
-    ["PUT", "POST"],
+    ["POST"],
   );
   assert.deepEqual(chamadas[0].corpo, { respostas: inicial.atual.valores });
 });
@@ -141,7 +141,7 @@ test("adapter legado de dúvidas converte histórico e confirma novo envio", asy
 
   const inicial = await adapter.carregar({ definicao });
   assert.equal(inicial.historico[0].status, "respondido");
-  assert.equal(inicial.historico[0].resposta?.autor, "Resposta do Matheus");
+  assert.equal(inicial.historico[0].resposta?.autor, "Resposta da equipe");
 
   const enviado = await adapter.enviar({
     definicao,

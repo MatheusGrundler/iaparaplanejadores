@@ -22,6 +22,11 @@ type LinhaFormulario = {
   arquivado: boolean;
 };
 
+const FORMULARIOS_DESATIVADOS = new Set([
+  "semana-0-skill-relatorio",
+  "quest-preparacao-skill",
+]);
+
 export type FormularioPublicado = {
   definicao: DefinicaoFormulario;
   formularioId: string | null;
@@ -46,6 +51,28 @@ function codigoPorIdentificador(identificador: string) {
   return porAtividade?.codigo ?? identificador;
 }
 
+function comLinguagemInstitucional(definicao: DefinicaoFormulario): DefinicaoFormulario {
+  if (definicao.workflow.tipo !== "duvida") return definicao;
+
+  return {
+    ...definicao,
+    descricao: definicao.descricao
+      .replaceAll("ao Matheus", "aqui para acompanharmos")
+      .replaceAll("pro Matheus", "aqui")
+      .replaceAll("do Matheus", "da equipe")
+      .replaceAll("Matheus", "equipe"),
+    workflow: {
+      ...definicao.workflow,
+      resposta: {
+        ...definicao.workflow.resposta,
+        rotuloAutor: definicao.workflow.resposta.rotuloAutor.includes("Matheus")
+          ? "Resposta da equipe"
+          : definicao.workflow.resposta.rotuloAutor,
+      },
+    },
+  };
+}
+
 /**
  * Resolve primeiro a versão publicada pelo construtor e usa a definição em
  * código como fallback. Assim o deploy das páginas não depende do painel.
@@ -53,6 +80,8 @@ function codigoPorIdentificador(identificador: string) {
 export async function carregarFormularioPublicado(
   identificador: string,
 ): Promise<FormularioPublicado | null> {
+  if (FORMULARIOS_DESATIVADOS.has(identificador)) return null;
+
   const codigo = codigoPorIdentificador(identificador);
   const db = privilegedDatabase();
   const { data: formulario, error: formularioError } = await db
@@ -87,7 +116,7 @@ export async function carregarFormularioPublicado(
         resultado.definicao.workflow.tipo === linha.tipo
       ) {
         return {
-          definicao: resultado.definicao,
+          definicao: comLinguagemInstitucional(resultado.definicao),
           formularioId: linha.id,
           versaoId: versao.id,
           semanaKey: linha.etapa_key,
@@ -102,7 +131,7 @@ export async function carregarFormularioPublicado(
   const semanaKey = definicao ? semanaDoFormulario(definicao) : null;
   if (!definicao || !semanaKey) return null;
   return {
-    definicao,
+    definicao: comLinguagemInstitucional(definicao),
     formularioId: null,
     versaoId: null,
     semanaKey,

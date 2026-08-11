@@ -68,49 +68,6 @@ export function criarAdaptadorFormularioEmMemoria(
       return ler(definicao, contexto);
     },
 
-    async salvarRascunho({ definicao, estado, contexto }) {
-      if (definicao.workflow.tipo !== "quest") {
-        throw new ErroRuntimeFormulario("Este formulário não usa rascunho automático.", {
-          codigo: "rascunho_indisponivel",
-        });
-      }
-      if (formularioBloqueado(definicao, estado)) {
-        throw new ErroRuntimeFormulario("Esta Quest já foi revisada.", {
-          codigo: "formulario_bloqueado",
-          status: 409,
-        });
-      }
-      const validacao = validarEnvioFormulario(
-        definicao,
-        estado.atual.valores,
-        estado.atual.anexos,
-        "rascunho",
-      );
-      if (!validacao.valido) {
-        throw new ErroRuntimeFormulario(
-          Object.values(validacao.errosCampos)[0] ??
-            validacao.errosGerais[0] ??
-            "Rascunho inválido.",
-          { codigo: "rascunho_invalido" },
-        );
-      }
-      const instante = agora().toISOString();
-      return gravar(
-        definicao,
-        {
-          ...estado,
-          atual: {
-            ...estado.atual,
-            id: estado.atual.id ?? gerarId(),
-            status: estado.atual.status === "enviado" ? "enviado" : "rascunho",
-            valores: validacao.valores,
-            atualizadoEm: instante,
-          },
-        },
-        contexto,
-      );
-    },
-
     async enviar({ definicao, estado, contexto }) {
       if (formularioBloqueado(definicao, estado)) {
         throw new ErroRuntimeFormulario("Esta Quest já foi revisada.", {

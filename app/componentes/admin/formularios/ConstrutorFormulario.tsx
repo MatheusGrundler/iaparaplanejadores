@@ -208,7 +208,9 @@ export function ConstrutorFormulario({
               />
               <span>
                 <strong>Quest</strong>
-                <small>Um rascunho por aluno, autosave, envio e bloqueio após revisão.</small>
+                <small>
+                  Um envio por aluno, preenchimento protegido na aba e bloqueio após revisão.
+                </small>
               </span>
             </label>
             <label
@@ -228,27 +230,6 @@ export function ConstrutorFormulario({
               </span>
             </label>
           </div>
-          {valor.workflow.tipo === "quest" && (
-            <div className={styles.fieldCompact}>
-              <label htmlFor={`${prefixo}-autosave`}>Intervalo do autosave</label>
-              <select
-                id={`${prefixo}-autosave`}
-                value={valor.workflow.rascunho.esperaMs}
-                disabled={somenteLeitura}
-                onChange={(event) =>
-                  onChange({
-                    ...valor,
-                    workflow: workflowQuest(Number(event.target.value)),
-                  })
-                }
-              >
-                <option value={600}>0,6 segundo</option>
-                <option value={900}>0,9 segundo</option>
-                <option value={1500}>1,5 segundo</option>
-                <option value={2500}>2,5 segundos</option>
-              </select>
-            </div>
-          )}
         </section>
 
         <section className={styles.editorSection} aria-labelledby={`${prefixo}-campos`}>

@@ -86,12 +86,14 @@ export default function Leitor({ id, titulo, statusInicial }: Props) {
     const aoEsconder = () => {
       if (document.visibilityState === "hidden") despeja(true);
     };
+    const aoSair = () => despeja(true);
     document.addEventListener("visibilitychange", aoEsconder);
-    window.addEventListener("pagehide", () => despeja(true));
+    window.addEventListener("pagehide", aoSair);
 
     return () => {
       window.clearInterval(relogio);
       document.removeEventListener("visibilitychange", aoEsconder);
+      window.removeEventListener("pagehide", aoSair);
       window.removeEventListener("message", aoMensagem);
       despeja(true);
     };
@@ -155,7 +157,7 @@ export default function Leitor({ id, titulo, statusInicial }: Props) {
             flexWrap: "wrap",
           }}
         >
-          <span className="muted" style={{ fontSize: ".85rem" }}>
+          <span className="muted" style={{ fontSize: ".875rem" }}>
             Terminou?
           </span>
           <button className="btn btn-mini" disabled={salvando} onClick={() => marcar("lido")}>
@@ -180,7 +182,7 @@ export default function Leitor({ id, titulo, statusInicial }: Props) {
         aoFechar={() => setCaixaDuvida(false)}
         aoRegistrar={() => {
           setStatus("duvida");
-          setAviso("Dúvida enviada pro Matheus. Ela pode virar tema da próxima live.");
+          setAviso("Dúvida enviada. Ela chegou aqui e pode virar tema da próxima live de dúvidas.");
         }}
       />
 

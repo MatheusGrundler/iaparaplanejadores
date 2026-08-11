@@ -7,6 +7,8 @@ type Turma = { id: number; nome: string };
 type LiberacaoTurma = { turma_id: number; semana_key: string; liberada: boolean };
 type Aluno = { email: string; nome: string | null; turma_id: number | null };
 type AjusteIndividual = { email: string; etapa_key: string; liberada: boolean };
+type VersaoConteudoTurma = { turma_id: number; etapa_key: string; versao: string };
+type VersaoDisponivel = { codigo: string; rotulo: string };
 type AcaoFormulario = (formData: FormData) => void | Promise<void>;
 
 type Props = {
@@ -14,8 +16,11 @@ type Props = {
   liberacoes: ReadonlyArray<LiberacaoTurma>;
   alunos: ReadonlyArray<Aluno>;
   ajustesIndividuais: ReadonlyArray<AjusteIndividual>;
+  versoesConteudo?: ReadonlyArray<VersaoConteudoTurma>;
+  versoesDisponiveis?: ReadonlyArray<VersaoDisponivel>;
   definirLiberacaoSemana: AcaoFormulario;
   definirLiberacaoEtapaAluno: AcaoFormulario;
+  definirVersaoConteudoTurma?: AcaoFormulario;
 };
 
 export function PainelLiberacaoEtapas({
@@ -23,8 +28,11 @@ export function PainelLiberacaoEtapas({
   liberacoes,
   alunos,
   ajustesIndividuais,
+  versoesConteudo = [],
+  versoesDisponiveis = [],
   definirLiberacaoSemana,
   definirLiberacaoEtapaAluno,
+  definirVersaoConteudoTurma = () => undefined,
 }: Props) {
   const liberacoesPorTurma = new Map(
     liberacoes.map((item) => [`${item.turma_id}:${item.semana_key}`, item]),
@@ -33,6 +41,9 @@ export function PainelLiberacaoEtapas({
     ajustesIndividuais.map((item) => [`${item.email}:${item.etapa_key}`, item.liberada]),
   );
   const nomesDasTurmas = new Map(turmas.map((turma) => [turma.id, turma.nome]));
+  const versoesPorTurma = new Map(
+    versoesConteudo.map((item) => [`${item.turma_id}:${item.etapa_key}`, item.versao]),
+  );
 
   return (
     <main className="admin-etapas">
@@ -67,6 +78,7 @@ export function PainelLiberacaoEtapas({
                 const rotulo = etapa.number === 0 ? "Preparação" : `Etapa ${etapa.number}`;
                 const liberacao = liberacoesPorTurma.get(`${turma.id}:${semanaKey}`);
                 const liberada = liberacao?.liberada === true;
+                const versao = versoesPorTurma.get(`${turma.id}:${semanaKey}`) ?? "v1";
                 return (
                   <article key={semanaKey}>
                     <div>
@@ -74,7 +86,22 @@ export function PainelLiberacaoEtapas({
                       <strong>{etapa.title}</strong>
                     </div>
                     <div className="admin-etapas-acoes">
-                      <Link href={`/etapa/${slugPublicoEtapa(semanaKey)}`}>Pré-visualizar</Link>
+                      <Link href={`/etapa/${slugPublicoEtapa(semanaKey)}?versao=${versao}`}>
+                        Pré-visualizar
+                      </Link>
+                      <form action={definirVersaoConteudoTurma} className="admin-etapas-acoes">
+                        <input type="hidden" name="turma_id" value={turma.id} />
+                        <input type="hidden" name="semana_key" value={semanaKey} />
+                        <label>
+                          <span className="sr-only">Versão do conteúdo</span>
+                          <select name="versao" defaultValue={versao}>
+                            {versoesDisponiveis.map((opcao) => (
+                              <option key={opcao.codigo} value={opcao.codigo}>{opcao.rotulo}</option>
+                            ))}
+                          </select>
+                        </label>
+                        <button className="btn btn-fantasma btn-mini" type="submit">Versão</button>
+                      </form>
                       <form action={definirLiberacaoSemana}>
                         <input type="hidden" name="turma_id" value={turma.id} />
                         <input type="hidden" name="semana_key" value={semanaKey} />

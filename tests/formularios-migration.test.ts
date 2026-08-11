@@ -39,3 +39,20 @@ test("guard de anexos usa limite versionado e falha fechado", async () => {
   assert.match(sql, /limite is null or limite < 1 or limite > 20/);
   assert.match(sql, /Campo de anexo fora do catálogo/);
 });
+
+test("formulário antigo de skill da Preparação é arquivado sem apagar respostas", async () => {
+  const sql = await migration("20260810213000_arquivar_skill_preparacao.sql");
+
+  assert.match(sql, /update public\.curso_formularios/);
+  assert.match(sql, /quest-preparacao-skill/);
+  assert.match(sql, /semana-0-skill-relatorio/);
+  assert.doesNotMatch(sql, /delete\s+from/i);
+});
+
+test("autoria pessoal antiga da comunidade passa a usar a equipe", async () => {
+  const sql = await migration("20260810213200_institucionalizar_autoria_comunidade.sql");
+
+  assert.match(sql, /update public\.posts/);
+  assert.match(sql, /Equipe IA para Planejadores/);
+  assert.doesNotMatch(sql, /delete\s+from/i);
+});

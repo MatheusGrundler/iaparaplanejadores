@@ -1,11 +1,31 @@
+import { redirect } from "next/navigation";
 import { canAccessAdminArea } from "@/lib/auth";
+import {
+  calcularPaginacao,
+  itensPorPaginaDoParametro,
+  paginaDoParametro,
+  type ParametroBusca,
+} from "@/lib/admin-paginacao";
 import { rotuloEtapa } from "@/lib/curso-nomenclatura";
 import { REGISTRO_FORMULARIOS, type DefinicaoFormulario } from "@/lib/formularios";
 import { validarDefinicaoFormulario } from "@/lib/formularios/validacao";
 import { privilegedDatabase } from "@/lib/supabase/admin";
-import { marcarQuestRevisada, responderDuvidaSemana } from "./actions";
+import {
+  ListaDuvidasAdmin,
+  ListaEntregasAdmin,
+  type AnexoAdmin,
+  type DuvidaAdmin,
+  type EntregaAdmin,
+  type RespostaAdmin,
+} from "./ListasPaginadas";
 
 export const dynamic = "force-dynamic";
+
+type SearchParams = Record<string, ParametroBusca>;
+
+type Props = {
+  searchParams: Promise<SearchParams>;
+};
 
 type Quest = {
   id: string;
@@ -36,6 +56,7 @@ type Duvida = {
   formulario_versao_id: string | null;
   semana_key: string;
   pergunta: string;
+  respostas: Record<string, unknown> | null;
   resposta: string | null;
   status: string;
   criada_em: string;
@@ -55,7 +76,7 @@ function quando(iso: string | null) {
 function tamanho(bytes: number | null) {
   if (!bytes) return "";
   return bytes < 1024 * 1024
-    ? `${Math.round(bytes / 1024)} KB`
+    ? `${Math.max(1, Math.round(bytes / 1024))} KB`
     : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
@@ -64,36 +85,116 @@ function rotuloChave(chave: string) {
   return match ? rotuloEtapa(Number(match[1])) : chave;
 }
 
-export default async function EntregasPage() {
+function textoValor(valor: unknown) {
+  if (valor === null || valor === undefined) return "";
+  if (typeof valor === "string") return valor;
+  if (typeof valor === "object") return JSON.stringify(valor, null, 2);
+  return String(valor);
+}
+
+function respostasComRotulos(
+  valores: Record<string, unknown> | null | undefined,
+  formulario?: DefinicaoFormulario | null,
+): RespostaAdmin[] {
+  const objeto = valores ?? {};
+  const chavesDoFormulario = formulario?.campos.map((campo) => campo.chave) ?? [];
+  const chaves = [...new Set([...chavesDoFormulario, ...Object.keys(objeto)])];
+  return chaves.map((chave) => ({
+    chave,
+    rotulo: formulario?.campos.find((campo) => campo.chave === chave)?.rotulo ?? chave,
+    valor: textoValor(objeto[chave]),
+  }));
+}
+
+function parametrosParaUrl(parametros: SearchParams) {
+  const busca = new URLSearchParams();
+  for (const [chave, valor] of Object.entries(parametros)) {
+    const primeiro = Array.isArray(valor) ? valor[0] : valor;
+    if (primeiro !== undefined) busca.set(chave, primeiro);
+  }
+  return busca;
+}
+
+function rotuloTotal(total: number, singular: string, plural: string) {
+  return `${total} ${total === 1 ? singular : plural}`;
+}
+
+export default async function EntregasPage({ searchParams }: Props) {
   if (!(await canAccessAdminArea())) return null;
+  const parametros = await searchParams;
+  const paginaEntregas = paginaDoParametro(parametros.paginaEntregas);
+  const porPaginaEntregas = itensPorPaginaDoParametro(parametros.porPaginaEntregas);
+  const paginaDuvidas = paginaDoParametro(parametros.paginaDuvidas);
+  const porPaginaDuvidas = itensPorPaginaDoParametro(parametros.porPaginaDuvidas);
+  const inicioEntregas = (paginaEntregas - 1) * porPaginaEntregas;
+  const inicioDuvidas = (paginaDuvidas - 1) * porPaginaDuvidas;
   const db = privilegedDatabase();
 
-  const [questsResult, anexosResult, duvidasResult] = await Promise.all([
+  const [questsResult, duvidasResult, duvidasAbertasResult] = await Promise.all([
     db
       .from("quest_respostas")
       .select(
         "id, email, formulario_versao_id, semana_key, quest_key, respostas, status, enviada_em, revisada_em",
+        { count: "exact" },
       )
       .in("status", ["enviada", "revisada"])
       .order("enviada_em", { ascending: false })
-      .limit(100),
-    db
-      .from("quest_anexos")
-      .select("id, resposta_id, campo, file, nome_original, mime, bytes")
-      .eq("status", "pronto")
-      .order("criado_em", { ascending: true }),
+      .order("id", { ascending: false })
+      .range(inicioEntregas, inicioEntregas + porPaginaEntregas - 1),
     db
       .from("curso_duvidas")
       .select(
-        "id, email, formulario_codigo, formulario_versao_id, semana_key, pergunta, resposta, status, criada_em",
+        "id, email, formulario_codigo, formulario_versao_id, semana_key, pergunta, respostas, resposta, status, criada_em",
+        { count: "exact" },
       )
       .order("criada_em", { ascending: false })
-      .limit(100),
+      .order("id", { ascending: false })
+      .range(inicioDuvidas, inicioDuvidas + porPaginaDuvidas - 1),
+    db
+      .from("curso_duvidas")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "aberta"),
   ]);
 
   const quests = (questsResult.data ?? []) as Quest[];
   const duvidas = (duvidasResult.data ?? []) as Duvida[];
-  const anexos = (anexosResult.data ?? []) as Anexo[];
+  const paginacaoEntregas = calcularPaginacao(
+    questsResult.count ?? quests.length,
+    paginaEntregas,
+    porPaginaEntregas,
+  );
+  const paginacaoDuvidas = calcularPaginacao(
+    duvidasResult.count ?? duvidas.length,
+    paginaDuvidas,
+    porPaginaDuvidas,
+  );
+
+  if (
+    paginacaoEntregas.pagina !== paginaEntregas ||
+    paginacaoDuvidas.pagina !== paginaDuvidas
+  ) {
+    const busca = parametrosParaUrl(parametros);
+    busca.set("paginaEntregas", String(paginacaoEntregas.pagina));
+    busca.set("porPaginaEntregas", String(porPaginaEntregas));
+    busca.set("paginaDuvidas", String(paginacaoDuvidas.pagina));
+    busca.set("porPaginaDuvidas", String(porPaginaDuvidas));
+    redirect(`/admin/entregas?${busca.toString()}`);
+  }
+
+  const questIdsDaPagina = quests.map((quest) => quest.id);
+  let anexos: Anexo[] = [];
+  let erroAnexos = false;
+  if (questIdsDaPagina.length) {
+    const anexosResult = await db
+      .from("quest_anexos")
+      .select("id, resposta_id, campo, file, nome_original, mime, bytes")
+      .in("resposta_id", questIdsDaPagina)
+      .eq("status", "pronto")
+      .order("criado_em", { ascending: true });
+    anexos = (anexosResult.data ?? []) as Anexo[];
+    erroAnexos = Boolean(anexosResult.error);
+  }
+
   const formularioVersaoIds = [
     ...new Set(
       [...quests, ...duvidas]
@@ -107,8 +208,6 @@ export default async function EntregasPage() {
         .select("id, numero, definicao")
         .in("id", formularioVersaoIds)
     : { data: [], error: null };
-  const erro =
-    questsResult.error || anexosResult.error || duvidasResult.error || versoesResult.error;
   const versaoPorId = new Map<string, { numero: number; definicao: DefinicaoFormulario }>();
   for (const versao of versoesResult.data ?? []) {
     const validacao = validarDefinicaoFormulario(versao.definicao);
@@ -119,12 +218,91 @@ export default async function EntregasPage() {
       });
     }
   }
+
   const anexosComUrl = await Promise.all(
     anexos.map(async (anexo) => {
       const { data } = await db.storage.from("quest-anexos").createSignedUrl(anexo.file, 3600);
       return { ...anexo, url: data?.signedUrl ?? null };
     }),
   );
+  const anexosPorResposta = new Map<string, typeof anexosComUrl>();
+  for (const anexo of anexosComUrl) {
+    const atuais = anexosPorResposta.get(anexo.resposta_id) ?? [];
+    atuais.push(anexo);
+    anexosPorResposta.set(anexo.resposta_id, atuais);
+  }
+
+  const entregas: EntregaAdmin[] = quests.map((quest) => {
+    const versao = quest.formulario_versao_id
+      ? versaoPorId.get(quest.formulario_versao_id)
+      : undefined;
+    const formulario = versao?.definicao ?? REGISTRO_FORMULARIOS.buscar(quest.quest_key);
+    const anexosDaQuest = anexosPorResposta.get(quest.id) ?? [];
+    const anexosFormatados: AnexoAdmin[] = anexosDaQuest.map((anexo) => ({
+      id: anexo.id,
+      nome: anexo.nome_original,
+      campo:
+        formulario?.anexos.find((campo) => campo.chave === anexo.campo)?.rotulo ?? anexo.campo,
+      tamanho: tamanho(anexo.bytes),
+      url: anexo.url,
+    }));
+    return {
+      id: quest.id,
+      email: quest.email,
+      titulo: formulario?.titulo ?? quest.quest_key,
+      etapa: rotuloChave(quest.semana_key),
+      versao: versao?.numero ?? null,
+      status: quest.status,
+      statusRotulo: quest.status === "revisada" ? "Revisada" : "A revisar",
+      enviadaEm: quando(quest.enviada_em),
+      revisadaEm: quest.revisada_em ? quando(quest.revisada_em) : null,
+      respostas: respostasComRotulos(quest.respostas, formulario),
+      anexos: anexosFormatados,
+    };
+  });
+
+  const duvidasFormatadas: DuvidaAdmin[] = duvidas.map((duvida) => {
+    const versao = duvida.formulario_versao_id
+      ? versaoPorId.get(duvida.formulario_versao_id)
+      : undefined;
+    const formulario =
+      versao?.definicao ??
+      (duvida.formulario_codigo
+        ? REGISTRO_FORMULARIOS.buscar(duvida.formulario_codigo)
+        : undefined);
+    const informacoes = respostasComRotulos(duvida.respostas, formulario).filter(
+      (resposta) => resposta.chave !== "pergunta",
+    );
+    const status =
+      duvida.status === "arquivada"
+        ? "arquivada"
+        : Boolean(duvida.resposta) || duvida.status === "respondida"
+          ? "respondida"
+          : "aberta";
+    const statusRotulo =
+      status === "arquivada" ? "Arquivada" : status === "respondida" ? "Respondida" : "Aberta";
+    return {
+      id: duvida.id,
+      email: duvida.email,
+      etapa: rotuloChave(duvida.semana_key),
+      versao: versao?.numero ?? null,
+      status,
+      statusRotulo,
+      criadaEm: quando(duvida.criada_em),
+      pergunta: duvida.pergunta,
+      informacoes,
+      resposta: duvida.resposta,
+    };
+  });
+
+  const erro = Boolean(
+    questsResult.error ||
+      duvidasResult.error ||
+      duvidasAbertasResult.error ||
+      versoesResult.error ||
+      erroAnexos,
+  );
+  const duvidasAbertas = duvidasAbertasResult.count ?? 0;
 
   return (
     <main className="admin-entregas">
@@ -133,8 +311,8 @@ export default async function EntregasPage() {
 
       {erro && (
         <p className="aviso erro">
-          As tabelas do curso ainda não estão disponíveis neste ambiente. Aplique a migration nova
-          antes de usar este painel.
+          Não foi possível carregar todas as informações agora. Atualize a página para tentar
+          novamente.
         </p>
       )}
 
@@ -144,82 +322,9 @@ export default async function EntregasPage() {
             <span className="pill">Quests</span>
             <h2 id="quests-admin-titulo">Entregas recebidas</h2>
           </div>
-          <span>{quests.length} entrega(s)</span>
+          <span>{rotuloTotal(paginacaoEntregas.total, "entrega", "entregas")}</span>
         </div>
-        {quests.length === 0 ? (
-          <div className="card vazio">Nenhuma Quest enviada ainda.</div>
-        ) : (
-          <div className="fila-admin">
-            {quests.map((quest) => {
-              const versao = quest.formulario_versao_id
-                ? versaoPorId.get(quest.formulario_versao_id)
-                : undefined;
-              const formulario = versao?.definicao ?? REGISTRO_FORMULARIOS.buscar(quest.quest_key);
-              const rotulo = rotuloChave(quest.semana_key);
-              const anexosDaQuest = anexosComUrl.filter((anexo) => anexo.resposta_id === quest.id);
-              return (
-                <article className="card entrega-admin" key={quest.id}>
-                  <div className="entrega-admin-topo">
-                    <div>
-                      <span className="pill">
-                        {rotulo}
-                        {versao ? ` · v${versao.numero}` : ""}
-                      </span>
-                      <h3>{formulario?.titulo ?? quest.quest_key}</h3>
-                    </div>
-                    <span className={`status-admin status-${quest.status}`}>
-                      {quest.status === "revisada" ? "Revisada" : "A revisar"}
-                    </span>
-                  </div>
-                  <div className="entrega-admin-meta">
-                    <strong>{quest.email}</strong>
-                    <span>Enviada {quando(quest.enviada_em)}</span>
-                  </div>
-                  <dl className="respostas-admin">
-                    {Object.entries(quest.respostas ?? {})
-                      .filter(([, valor]) => String(valor).trim())
-                      .map(([key, valor]) => {
-                        const campo = formulario?.campos.find((item) => item.chave === key);
-                        return (
-                          <div key={key}>
-                            <dt>{campo?.rotulo ?? key}</dt>
-                            <dd>{String(valor)}</dd>
-                          </div>
-                        );
-                      })}
-                  </dl>
-                  {anexosDaQuest.length > 0 && (
-                    <div className="anexos-admin">
-                      <strong>Arquivos</strong>
-                      <ul>
-                        {anexosDaQuest.map((anexo) => (
-                          <li key={anexo.id}>
-                            {anexo.url ? (
-                              <a href={anexo.url} target="_blank" rel="noreferrer">
-                                {anexo.nome_original} ↗
-                              </a>
-                            ) : (
-                              anexo.nome_original
-                            )}
-                            <span>{tamanho(anexo.bytes)}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  {quest.status === "enviada" && (
-                    <form action={marcarQuestRevisada}>
-                      <input type="hidden" name="id" value={quest.id} />
-                      <button className="btn btn-mini" type="submit">
-                        Marcar como revisada
-                      </button>
-                    </form>
-                  )}
-                </article>
-              );
-            })}
-          </div>
-        )}
+        <ListaEntregasAdmin itens={entregas} paginacao={paginacaoEntregas} />
       </section>
 
       <section className="duvidas-admin-secao" aria-labelledby="duvidas-admin-titulo">
@@ -228,54 +333,9 @@ export default async function EntregasPage() {
             <span className="pill">Dúvidas</span>
             <h2 id="duvidas-admin-titulo">Fila de perguntas</h2>
           </div>
-          <span>{duvidas.filter((item) => item.status === "aberta").length} aberta(s)</span>
+          <span>{rotuloTotal(duvidasAbertas, "aberta", "abertas")}</span>
         </div>
-        {duvidas.length === 0 ? (
-          <div className="card vazio">Nenhuma dúvida enviada ainda.</div>
-        ) : (
-          <div className="fila-admin">
-            {duvidas.map((duvida) => {
-              const versao = duvida.formulario_versao_id
-                ? versaoPorId.get(duvida.formulario_versao_id)
-                : undefined;
-              const rotulo = rotuloChave(duvida.semana_key);
-              return (
-                <article className="card duvida-admin-card" key={duvida.id}>
-                  <div className="entrega-admin-meta">
-                    <strong>{duvida.email}</strong>
-                    <span>
-                      {rotulo}
-                      {versao ? ` · v${versao.numero}` : ""} · {quando(duvida.criada_em)}
-                    </span>
-                  </div>
-                  <p>{duvida.pergunta}</p>
-                  {duvida.resposta ? (
-                    <div className="resposta-matheus">
-                      <strong>Sua resposta</strong>
-                      <p>{duvida.resposta}</p>
-                    </div>
-                  ) : (
-                    <form action={responderDuvidaSemana} className="responder-duvida">
-                      <input type="hidden" name="id" value={duvida.id} />
-                      <label htmlFor={`resposta-${duvida.id}`}>Responder</label>
-                      <textarea
-                        id={`resposta-${duvida.id}`}
-                        name="resposta"
-                        minLength={2}
-                        maxLength={5000}
-                        rows={4}
-                        required
-                      />
-                      <button className="btn btn-mini" type="submit">
-                        Enviar resposta
-                      </button>
-                    </form>
-                  )}
-                </article>
-              );
-            })}
-          </div>
-        )}
+        <ListaDuvidasAdmin itens={duvidasFormatadas} paginacao={paginacaoDuvidas} />
       </section>
     </main>
   );

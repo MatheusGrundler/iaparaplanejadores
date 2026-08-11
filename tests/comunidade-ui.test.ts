@@ -69,20 +69,21 @@ test("publicação segue rascunho, anexos, confirmação, publicação e limpeza
   assert.match(composer, /router\.refresh\(\)/);
 });
 
-test("feed assina em lote somente anexos prontos e renderiza cada tipo", async () => {
-  const [pagina, feed, config] = await Promise.all([
+test("Feed fica indisponível e a rota antiga volta para a trilha", async () => {
+  const [pagina, layout, estilos, feed, config] = await Promise.all([
     fonte("app/(aluno)/comunidade/page.tsx"),
+    fonte("app/(aluno)/layout.tsx"),
+    fonte("app/globals.css"),
     fonte("app/(aluno)/comunidade/Feed.tsx"),
     fonte("next.config.ts"),
   ]);
 
-  assert.match(pagina, /\.eq\("publicado", true\)/);
-  assert.match(pagina, /\.from\("post_anexos"\)/);
-  assert.match(pagina, /\.in\("post_id", ids\)/);
-  assert.match(pagina, /\.eq\("status", "pronto"\)/);
-  assert.match(pagina, /assinarAnexosComunidade/);
-  assert.match(pagina, /createSignedUrls\(paths, expiresIn\)/);
-  assert.match(pagina, /dangerouslySetInnerHTML/);
+  assert.match(pagina, /redirect\("\/"\)/);
+  assert.doesNotMatch(pagina, /\.from\("posts"\)/);
+  assert.match(layout, /Feed[\s\S]*Em breve/);
+  assert.match(layout, /nav-indisponivel/);
+  assert.match(estilos, /\.nav-indisponivel/);
+  assert.match(estilos, /cursor: not-allowed/);
   assert.match(feed, /<img[\s\S]*<video[\s\S]*<audio/);
   assert.match(feed, />\s*Abrir\s*</);
   assert.match(feed, />\s*Baixar\s*</);
