@@ -51,6 +51,24 @@ test("cenas retomam ao restaurar o scroll e permanecem visíveis sem GSAP", () =
   assert.match(landing, /document\.querySelectorAll\("\.passo \.pcap"\)/);
 });
 
+test("no celular, cenas ficam estáveis e não capturam o scroll", () => {
+  assert.match(landing, /const\s+MOBILE\s*=\s*matchMedia\("\(max-width: 860px\)"\)\.matches;/);
+  assert.match(
+    landing,
+    /const\s+MOTION_ENABLED\s*=\s*MOTION_READY\s*&&\s*!REDUCED\s*&&\s*!MOBILE;/,
+  );
+  assert.match(landing, /html\s*\{\s*scroll-snap-type:\s*none;/);
+  assert.match(landing, /min-height:\s*100svh;/);
+  assert.match(landing, /scroll-snap-align:\s*none;/);
+});
+
+test("a conversa reserva 330 px para as mensagens desde o início", () => {
+  assert.match(landing, /\.mini-chat\s*\{\s*height:\s*330px;/);
+  assert.match(landing, /#chatBox\s*\{\s*height:\s*100%;/);
+  assert.match(landing, /#chatBox\s*\{[\s\S]*?overflow:\s*hidden;/);
+  assert.doesNotMatch(landing, /#chatBox\s*\{\s*min-height:/);
+});
+
 test("mentoria é explicada antes do formulário e pode ser pré-selecionada", () => {
   const mentoria = landing.indexOf('id="mentoria"');
   const formulario = landing.indexOf('id="formVaga"');

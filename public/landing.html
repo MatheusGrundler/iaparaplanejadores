@@ -547,15 +547,17 @@
     }
 
     .mini-chat {
+      height: 330px;
       padding: 18px 20px 20px;
       font-size: 0.875rem;
     }
 
     #chatBox {
-      min-height: 172px;
+      height: 100%;
       display: flex;
       flex-direction: column;
       justify-content: flex-end;
+      overflow: hidden;
     }
 
     .bub {
@@ -2025,8 +2027,20 @@
     }
 
     @media (max-width: 860px) {
+      html {
+        scroll-snap-type: none;
+      }
+
+      .passo {
+        height: auto;
+        min-height: 100svh;
+        padding: 56px 0;
+        scroll-snap-align: none;
+      }
+
       .passo svg {
-        height: 44vh;
+        height: auto;
+        max-height: 44svh;
       }
 
       .pcap h3 {
@@ -2034,7 +2048,7 @@
       }
 
       .cenas-pontos {
-        right: 12px;
+        display: none;
       }
     }
 
@@ -3109,7 +3123,9 @@
     referrerpolicy="no-referrer"></script>
   <script>
     const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const MOBILE = matchMedia("(max-width: 860px)").matches;
     const MOTION_READY = Boolean(window.gsap && window.ScrollTrigger);
+    const MOTION_ENABLED = MOTION_READY && !REDUCED && !MOBILE;
 
     // nav scrolled
     const nav = document.getElementById("nav");
@@ -3146,7 +3162,7 @@
         { s: "you", t: "Prepare um rascunho de lembrete. Não envie." },
         { s: "ai", t: "Rascunho pronto para sua revisão. Nenhuma mensagem foi enviada." },
       ];
-      if (REDUCED) {
+      if (REDUCED || MOBILE) {
         box.innerHTML = seq.map((m) => `<div class="bub ${m.s} show">${m.t}</div>`).join("");
         return;
       }
@@ -3218,7 +3234,7 @@
           true,
         );
       });
-      if (REDUCED) return;
+      if (REDUCED || MOBILE) return;
       if (!("IntersectionObserver" in window)) {
         vids.forEach((v) => v.play().catch(() => { }));
         return;
@@ -3235,7 +3251,7 @@
     })();
 
     // GSAP
-    if (MOTION_READY && !REDUCED) {
+    if (MOTION_ENABLED) {
       gsap.registerPlugin(ScrollTrigger);
       gsap.set("[data-rv]", { opacity: 0, y: 26 });
       // hero entra em sequência
@@ -3302,7 +3318,7 @@
     }
 
     // ===== cenas em passos: desenham no foco, desdesenham ao sair =====
-    if (MOTION_READY && !REDUCED && document.querySelector(".passo")) {
+    if (MOTION_ENABLED && document.querySelector(".passo")) {
       gsap.registerPlugin(ScrollTrigger);
       const VEL = 1000,
         SOBREPOE = 0.45;
