@@ -4,6 +4,9 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "IA para Planejadores · Área de membros",
   description: "Materiais, comunidade e suporte da imersão IA para Planejadores.",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({
