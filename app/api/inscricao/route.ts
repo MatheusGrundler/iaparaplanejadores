@@ -1,6 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server";
 import nodemailer from "nodemailer";
 
+const TURNSTILE_ACTION = "inscricao";
+const TURNSTILE_HOSTNAMES = new Set(
+  (process.env.TURNSTILE_HOSTNAMES ?? "")
+    .split(",")
+    .map((hostname) => hostname.trim())
+    .filter(Boolean),
+);
+
 /**
  * Recebe o interesse vindo da landing e envia por SMTP.
  * Funciona com o Email Sandbox do Mailtrap (testes) e com qualquer provedor SMTP.
@@ -34,10 +42,50 @@ export async function POST(req: NextRequest) {
   const querMentoria = body.querMentoria === true;
   const honeypot = String(body.empresa ?? "").trim();
   const segundos = Number(body.segundos) || 0;
+  const turnstileToken = body["cf-turnstile-response"];
 
   // Honeypot preenchido ou envio rápido demais = robô. Responde ok sem agir.
   if (honeypot || (segundos > 0 && segundos < 3)) {
     return noStore(NextResponse.json({ ok: true }));
+  }
+
+  const secret = process.env.TURNSTILE_SECRET;
+  if (
+    typeof turnstileToken !== "string" ||
+    turnstileToken.length === 0 ||
+    turnstileToken.length > 2048 ||
+    !secret ||
+    TURNSTILE_HOSTNAMES.size === 0
+  ) {
+    return noStore(NextResponse.json({ ok: false, error: "verificacao" }, { status: 403 }));
+  }
+
+  let verificacao: { success?: boolean; action?: string; hostname?: string };
+  try {
+    const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+    const resposta = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      signal: AbortSignal.timeout(10_000),
+      body: new URLSearchParams({
+        secret,
+        response: turnstileToken,
+        ...(clientIp ? { remoteip: clientIp } : {}),
+      }),
+    });
+    if (!resposta.ok) throw new Error(`siteverify ${resposta.status}`);
+    verificacao = await resposta.json();
+  } catch {
+    return noStore(NextResponse.json({ ok: false, error: "verificacao" }, { status: 403 }));
+  }
+
+  if (
+    !verificacao.success ||
+    verificacao.action !== TURNSTILE_ACTION ||
+    !verificacao.hostname ||
+    !TURNSTILE_HOSTNAMES.has(verificacao.hostname)
+  ) {
+    return noStore(NextResponse.json({ ok: false, error: "verificacao" }, { status: 403 }));
   }
 
   const emailOk = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email);

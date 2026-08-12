@@ -2912,6 +2912,7 @@
             <label for="f-emp">Não preencha este campo</label><input type="text" id="f-emp" name="empresa" tabindex="-1"
               autocomplete="off" />
           </div>
+          <div class="cf-turnstile" id="turnstileInscricao" aria-label="Verificação de segurança"></div>
           <div class="form-msg" id="formMsg" role="status" aria-live="polite"></div>
           <button type="submit" class="btn btn-primary" style="width: 100%" data-cta id="formBtn">
             Quero minha vaga <span class="arrow" aria-hidden="true">↗</span>
@@ -3523,6 +3524,12 @@
       });
     }
   </script>
+  <script
+    src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
+    async
+    defer
+    onload="window.dispatchEvent(new Event('turnstile-ready'))"
+  ></script>
   <script>
     /* formulário de inscrição -> /api/inscricao (SMTP no servidor) */
     (function () {
@@ -3532,13 +3539,34 @@
         btn = document.getElementById("formBtn"),
         mentoria = document.getElementById("f-mentoria"),
         total = document.getElementById("formTotal"),
-        t0 = Date.now();
+        t0 = Date.now(),
+        turnstileContainer = document.getElementById("turnstileInscricao"),
+        turnstileWidgetId = null,
+        turnstileToken = "";
       function atualizaTotal() {
         if (!mentoria || !total) return;
         total.innerHTML = mentoria.checked
           ? "Você está solicitando interesse na <b>Imersão + Mentoria · R$ 4.497</b>."
           : "Você está solicitando interesse na <b>Imersão · R$ 1.497</b>.";
       }
+      function renderTurnstile() {
+        if (!window.turnstile || !turnstileContainer || turnstileWidgetId !== null) return;
+        turnstileWidgetId = window.turnstile.render(turnstileContainer, {
+          sitekey: "0x4AAAAAAENe08k9g-d6D5PY",
+          action: "inscricao",
+          callback: function (token) {
+            turnstileToken = token;
+          },
+          "expired-callback": function () {
+            turnstileToken = "";
+          },
+          "error-callback": function () {
+            turnstileToken = "";
+          },
+        });
+      }
+      window.addEventListener("turnstile-ready", renderTurnstile);
+      renderTurnstile();
       if (mentoria) mentoria.addEventListener("change", atualizaTotal);
       document.querySelectorAll("[data-select-mentoria]").forEach(function (cta) {
         cta.addEventListener("click", function () {
@@ -3563,6 +3591,11 @@
           msg.textContent = "Confere os três campos? Nome, e-mail válido e WhatsApp com DDD.";
           return;
         }
+        if (!turnstileToken) {
+          msg.className = "form-msg err";
+          msg.textContent = "Conclua a verificação de segurança para enviar.";
+          return;
+        }
         btn.disabled = true;
         var btnHTML = btn.innerHTML;
         btn.textContent = "Enviando…";
@@ -3576,6 +3609,7 @@
             querMentoria: Boolean(mentoria && mentoria.checked),
             empresa: f.empresa.value,
             segundos: Math.round((Date.now() - t0) / 1000),
+            "cf-turnstile-response": turnstileToken,
           }),
         })
           .then(function (r) {
@@ -3608,6 +3642,12 @@
             msg.className = "form-msg err";
             msg.innerHTML =
               'Não consegui registrar agora. Me escreve direto: <a href="mailto:contato@iaparaplanejadores.com.br?subject=Interesse%20na%20turma%20fundadora">contato@iaparaplanejadores.com.br</a>';
+          })
+          .finally(function () {
+            if (turnstileWidgetId !== null && window.turnstile) {
+              window.turnstile.reset(turnstileWidgetId);
+              turnstileToken = "";
+            }
           });
       });
     })();
