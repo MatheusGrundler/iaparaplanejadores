@@ -22,6 +22,11 @@ test("a CSP permite os scripts de movimento usados pela landing", async () => {
   assert.match(csp ?? "", /script-src[^;]*https:\/\/cdnjs\.cloudflare\.com/);
 });
 
+test("a landing estática também registra visitas no Vercel Analytics", () => {
+  assert.match(landing, /window\.va\s*=\s*window\.va\s*\|\|\s*function/);
+  assert.match(landing, /<script defer src="\/_vercel\/insights\/script\.js"><\/script>/);
+});
+
 test("GSAP e ScrollTrigger têm versão fixa e integridade verificável", () => {
   const scripts = landing.match(
     /<script\b[^>]*\bsrc="https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/gsap\/3\.12\.5\/(?:gsap|ScrollTrigger)\.min\.js"[^>]*><\/script>/g,
