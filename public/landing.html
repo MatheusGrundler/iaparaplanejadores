@@ -3127,9 +3127,8 @@
     referrerpolicy="no-referrer"></script>
   <script>
     const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const MOBILE = matchMedia("(max-width: 860px)").matches;
     const MOTION_READY = Boolean(window.gsap && window.ScrollTrigger);
-    const MOTION_ENABLED = MOTION_READY && !REDUCED && !MOBILE;
+    const MOTION_ENABLED = MOTION_READY && !REDUCED;
 
     // nav scrolled
     const nav = document.getElementById("nav");
@@ -3166,7 +3165,7 @@
         { s: "you", t: "Prepare um rascunho de lembrete. Não envie." },
         { s: "ai", t: "Rascunho pronto para sua revisão. Nenhuma mensagem foi enviada." },
       ];
-      if (REDUCED || MOBILE) {
+      if (REDUCED) {
         box.innerHTML = seq.map((m) => `<div class="bub ${m.s} show">${m.t}</div>`).join("");
         return;
       }
@@ -3238,7 +3237,7 @@
           true,
         );
       });
-      if (REDUCED || MOBILE) return;
+      if (REDUCED) return;
       if (!("IntersectionObserver" in window)) {
         vids.forEach((v) => v.play().catch(() => { }));
         return;

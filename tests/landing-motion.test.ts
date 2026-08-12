@@ -56,12 +56,12 @@ test("cenas retomam ao restaurar o scroll e permanecem visíveis sem GSAP", () =
   assert.match(landing, /document\.querySelectorAll\("\.passo \.pcap"\)/);
 });
 
-test("no celular, cenas ficam estáveis e não capturam o scroll", () => {
-  assert.match(landing, /const\s+MOBILE\s*=\s*matchMedia\("\(max-width: 860px\)"\)\.matches;/);
+test("no celular, animações não reativam o encaixe automático de scroll", () => {
   assert.match(
     landing,
-    /const\s+MOTION_ENABLED\s*=\s*MOTION_READY\s*&&\s*!REDUCED\s*&&\s*!MOBILE;/,
+    /const\s+MOTION_ENABLED\s*=\s*MOTION_READY\s*&&\s*!REDUCED;/,
   );
+  assert.doesNotMatch(landing, /const\s+MOBILE\s*=/);
   assert.match(landing, /html\s*\{\s*scroll-snap-type:\s*none;/);
   assert.match(landing, /min-height:\s*100svh;/);
   assert.match(landing, /scroll-snap-align:\s*none;/);
